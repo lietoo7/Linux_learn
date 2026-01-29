@@ -11,7 +11,7 @@
 6. [Automation]( )
 7. [System Logs]( )
 8. [Package Management]( )
-
+9. [Débogage_matériel](09_débogage_matériel.md)
 ---
 
 ## 1. Interaction avec le système de fichiers
