@@ -18,22 +18,31 @@ Linux utilise une philosophie simple : "Tout est fichier". Votre matériel est r
 
 * 
 **/dev/** : Fichiers de périphériques (devices) 
+
 * 
 `/dev/sda` = premier disque SATA 
+
 * 
 `/dev/ttyUSB0` = premier port série USB 
+
 * 
 `/dev/input/` = périphériques d'entrée (clavier, souris) 
+
 * 
 **/sys/** : Système de fichiers virtuel exposant les informations du kernel sur le matériel 
+
 * 
 `/sys/class/` : Classification par type de périphérique 
+
 * 
 `/sys/devices/` : Arborescence physique des périphériques 
+
 * 
 **/proc/** : Informations sur les processus ET le système 
+
 * 
 `/proc/cpuinfo` : informations CPU 
+
 * 
 `/proc/meminfo` : informations mémoire 
 
