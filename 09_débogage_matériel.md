@@ -1,6 +1,7 @@
-# Guide Complet : Maîtriser le Débogage Matériel via Shell sous Linux
+# Guide Complet : Maîtriser le Débogage Matériel via le Shell sous Linux
 
 ## Table des matières
+
 1. Introduction et concepts fondamentaux
 2. RAM - Mémoire vive
 3. CPU - Processeur
@@ -12,65 +13,50 @@
 9. Architecture complète du système
 10. Méthodologie de diagnostic
 
+---
+
 ## 1. Introduction et concepts fondamentaux
+
 ### 1.1 Comment Linux voit votre matériel
+
 Linux utilise une philosophie simple : "Tout est fichier". Votre matériel est représenté par des fichiers dans des répertoires spéciaux :
 
-* 
-**/dev/** : Fichiers de périphériques (devices) 
+- **`/dev/`** : Fichiers de périphériques (devices)
+  - `/dev/sda` = premier disque SATA
+  - `/dev/ttyUSB0` = premier port série USB
+  - `/dev/input/` = périphériques d'entrée (clavier, souris)
 
-* 
-`/dev/sda` = premier disque SATA 
+- **`/sys/`** : Système de fichiers virtuel exposant les informations du kernel sur le matériel
+  - `/sys/class/` : Classification par type de périphérique
+  - `/sys/devices/` : Arborescence physique des périphériques
 
-* 
-`/dev/ttyUSB0` = premier port série USB 
-
-* 
-`/dev/input/` = périphériques d'entrée (clavier, souris) 
-
-* 
-**/sys/** : Système de fichiers virtuel exposant les informations du kernel sur le matériel 
-
-* 
-`/sys/class/` : Classification par type de périphérique 
-
-* 
-`/sys/devices/` : Arborescence physique des périphériques 
-
-* 
-**/proc/** : Informations sur les processus ET le système 
-
-* 
-`/proc/cpuinfo` : informations CPU 
-
-* 
-`/proc/meminfo` : informations mémoire 
+- **`/proc/`** : Informations sur les processus ET le système
+  - `/proc/cpuinfo` : informations CPU
+  - `/proc/meminfo` : informations mémoire
 
 **Pourquoi c'est important** : Comprendre cette structure vous permet de savoir OÙ chercher l'information et comment le système organise le matériel.
 
 ### 1.2 Les bus de communication
+
 Votre ordinateur utilise plusieurs "autoroutes" pour faire communiquer les composants :
 
-* 
-**PCI/PCIe (Peripheral Component Interconnect Express)** : 
-* Bus haute vitesse pour cartes graphiques, WiFi, SSD NVMe 
-* Commande : `lspci` 
-* 
-**USB (Universal Serial Bus)** : 
-* Bus pour périphériques externes et certains internes 
-* Commande : `lsusb`
-* 
-**SATA (Serial ATA)** : 
-* Bus pour disques durs et lecteurs optiques 
-* Visible via `lsblk` ou `fdisk -l` 
+- **PCI/PCIe (Peripheral Component Interconnect Express)** :
+  - Bus haute vitesse pour cartes graphiques, WiFi, SSD NVMe
+  - Commande : `lspci`
+
+- **USB (Universal Serial Bus)** :
+  - Bus pour périphériques externes et certains internes
+  - Commande : `lsusb`
+
+- **SATA (Serial ATA)** :
+  - Bus pour disques durs et lecteurs optiques
+  - Visible via `lsblk` ou `fdisk -l`
 
 ### 1.3 Les drivers (pilotes)
 
-Un driver est un traducteur entre le kernel Linux et votre matériel.
-**Sans driver** : 
-
-* Le matériel existe physiquement 
-* Mais Linux ne sait pas lui parler 
+Un driver est un traducteur entre le kernel Linux et votre matériel. Sans driver :
+- Le matériel existe physiquement
+- Mais Linux ne sait pas lui parler
 
 **Comment vérifier les drivers** :
 
@@ -80,66 +66,73 @@ lsmod
 
 # Exemple de sortie :
 # Module                  Size  Used by
-# iwlwifi               282624  1 iwlmvm    
-
+# iwlwifi               282624  1 iwlmvm    → Driver WiFi Intel
+# e1000e                278528  0           → Driver Ethernet Intel
 ```
 
-* 
-**iwlwifi** : Driver WiFi Intel 
-* 
-**e1000e** : Driver Ethernet Intel 
 **Comprendre la sortie** :
-* 
-**Module** : nom du driver 
-* 
-**Size** : taille en mémoire 
-* 
-**Used by** : combien de fois utilisé et par quoi 
-
-
+- **Module** : nom du driver
+- **Size** : taille en mémoire
+- **Used by** : combien de fois utilisé et par quoi
 
 ---
+
 ## 2. RAM - Mémoire vive
+
 ### 2.1 Qu'est-ce que la RAM ?
+
 La RAM (Random Access Memory) est la mémoire temporaire de votre ordinateur :
-* Volatile : perd son contenu à l'extinction 
-* Rapide : accès en nanosecondes 
-* Limitée : 4-16GB typiquement sur un T420 
+- **Volatile** : perd son contenu à l'extinction
+- **Rapide** : accès en nanosecondes
+- **Limitée** : 4-16GB typiquement sur un T420
+
 ### 2.2 Architecture mémoire
+
 Votre T420 a 2 slots SO-DIMM (Small Outline Dual In-line Memory Module) :
-* Maximum : 8GB (2x 4GB)
-* Type : DDR3 PC3-10600 (1333MHz) ou PC3-12800 (1600MHz)
-* Format : 204 pins 
+- **Maximum** : 8GB (2x 4GB)
+- **Type** : DDR3 PC3-10600 (1333MHz) ou PC3-12800 (1600MHz)
+- **Format** : 204 pins
+
 ### 2.3 Diagnostic approfondi
-Commande basique : free
+
+#### Commande basique : free
+
 ```bash
 free -h
-Sortie typique :
+```
+
+**Sortie typique** :
+```
               total        used        free      shared  buff/cache   available
 Mem:           7.7G        2.3G        3.1G        234M        2.3G        4.8G
 Swap:          4.0G          0B        4.0G
 ```
-Décryptage ligne par ligne :
-- total : RAM physique totale (7.7GB sur 8GB installés - une partie est réservée)
-- used : mémoire activement utilisée par les applications (2.3GB)
-- free : mémoire complètement inutilisée (3.1GB)
-- shared : mémoire partagée entre processus (234MB)
-  - buff/cache : mémoire utilisée pour optimiser les performances
+
+**Décryptage ligne par ligne** :
+- **total** : RAM physique totale (7.7GB sur 8GB installés - une partie est réservée)
+- **used** : mémoire activement utilisée par les applications (2.3GB)
+- **free** : mémoire complètement inutilisée (3.1GB)
+- **shared** : mémoire partagée entre processus (234MB)
+- **buff/cache** : mémoire utilisée pour optimiser les performances
   - buffers : données en attente d'écriture sur disque
   - cache : fichiers récemment lus gardés en mémoire
-    - IMPORTANT : Cette mémoire est libérable instantanément si nécessaire ! 
-  - available : mémoire réellement disponible pour nouvelles applications (4.8GB) 
-        - C'est le chiffre le plus important ! 
-- Swap : espace disque utilisé comme mémoire "de secours" 
-        - Si swap utilisé = votre RAM est saturée = système ralenti
-  
-L'option -h : "human-readable" - affiche en GB/MB au lieu d'octets
-Commande avancée : dmidecode
+  - **IMPORTANT** : Cette mémoire est libérable instantanément si nécessaire !
+- **available** : mémoire réellement disponible pour nouvelles applications (4.8GB)
+  - C'est le chiffre le plus important !
+- **Swap** : espace disque utilisé comme mémoire "de secours"
+  - Si swap utilisé = votre RAM est saturée = système ralenti
+
+**L'option -h** : "human-readable" - affiche en GB/MB au lieu d'octets
+
+#### Commande avancée : dmidecode
+
 ```bash
 sudo dmidecode -t memory
 ```
-Pourquoi sudo ? : dmidecode lit le BIOS/UEFI, zone protégée nécessitant les droits root.
-Sortie typique :
+
+**Pourquoi sudo ?** : dmidecode lit le BIOS/UEFI, zone protégée nécessitant les droits root.
+
+**Sortie typique** :
 ```
 Handle 0x0005, DMI type 16, 23 bytes
 Physical Memory Array
@@ -163,110 +156,148 @@ Memory Device
         Manufacturer: Samsung
         Serial Number: 12345678
 ```
-Décryptage :
-    - Physical Memory Array : Informations sur la carte mère 
-        - Maximum Capacity: 8 GB : maximum supporté 
-        - Number Of Devices: 2 : 2 slots disponibles 
-        - Error Correction Type: None : pas de ECC (correction d'erreurs) 
-    - Memory Device : Informations sur CHAQUE barrette 
-        - Size: 4096 MB : taille de cette barrette (4GB) 
-        - Form Factor: SODIMM : format laptop (vs DIMM pour desktop) 
-        - Locator: ChannelA-DIMM0 : emplacement physique (slot 1) 
-        - Type: DDR3 : génération de RAM 
-        - Speed: 1333 MT/s : fréquence (MHz) 
-        - Manufacturer: Samsung : fabricant 
-        - Serial Number : numéro unique de la barrette 
-Astuce pratique : Si vous avez un slot vide, Size: No Module Installed apparaîtra.
-Vérifier les erreurs mémoire
+
+**Décryptage** :
+- **Physical Memory Array** : Informations sur la carte mère
+  - Maximum Capacity: 8 GB : maximum supporté
+  - Number Of Devices: 2 : 2 slots disponibles
+  - Error Correction Type: None : pas de ECC (correction d'erreurs)
+- **Memory Device** : Informations sur CHAQUE barrette
+  - Size: 4096 MB : taille de cette barrette (4GB)
+  - Form Factor: SODIMM : format laptop (vs DIMM pour desktop)
+  - Locator: ChannelA-DIMM0 : emplacement physique (slot 1)
+  - Type: DDR3 : génération de RAM
+  - Speed: 1333 MT/s : fréquence (MHz)
+  - Manufacturer: Samsung : fabricant
+  - Serial Number : numéro unique de la barrette
+
+**Astuce pratique** : Si vous avez un slot vide, `Size: No Module Installed` apparaîtra.
+
+#### Vérifier les erreurs mémoire
+
 ```bash
 sudo journalctl -k | grep -i "memory\|edac"
 ```
-Explication :
-    - journalctl -k : affiche les logs du kernel 
-    - grep -i : filtre (case insensitive) pour "memory" OU "edac" 
-    - EDAC : Error Detection And Correction - système de détection d'erreurs RAM 
-Ce que vous cherchez :
-    - Messages comme "EDAC MC0: UE" = Uncorrectable Error (barrette défectueuse !) 
-    - "MCE" = Machine Check Exception (erreur matérielle grave)
-    
+
+**Explication** :
+- `journalctl -k` : affiche les logs du kernel
+- `grep -i` : filtre (case insensitive) pour "memory" OU "edac"
+- **EDAC** : Error Detection And Correction - système de détection d'erreurs RAM
+
+**Ce que vous cherchez** :
+- Messages comme "EDAC MC0: UE" = Uncorrectable Error (barrette défectueuse !)
+- "MCE" = Machine Check Exception (erreur matérielle grave)
+
 ### 2.4 Tests de RAM
-Memtest86+ (le plus fiable)
+
+#### Memtest86+ (le plus fiable)
+
 Depuis le GRUB au démarrage - test HORS système d'exploitation :
+
 ```bash
 # Installer
 sudo dnf install memtest86+
 
 # Au prochain reboot, choisir "Memory test" dans le menu GRUB
-Pourquoi hors OS ? : Teste toute la RAM sans interférence du système.
-Durée : Minimum 1 passe complète (2-3h pour 8GB). Idéalement : nuit complète.
-Interprétation :
-    • 0 erreur : RAM saine 
-    • 1+ erreur : Barrette défectueuse ou mal installée 
-memtester (test rapide sous OS)
-bash
+```
+
+**Pourquoi hors OS ?** : Teste toute la RAM sans interférence du système.
+
+**Durée** : Minimum 1 passe complète (2-3h pour 8GB). Idéalement : nuit complète.
+
+**Interprétation** :
+- 0 erreur : RAM saine
+- 1+ erreur : Barrette défectueuse ou mal installée
+
+#### memtester (test rapide sous OS)
+
+```bash
 # Installer
 sudo dnf install memtester
 
 # Tester 1GB pendant 5 passes
 sudo memtester 1G 5
 ```
-Explication :
-    - 1G : quantité à tester (limitée car l'OS tourne) 
-    - 5 : nombre de passes (répétitions du test) 
-Patterns de test :
-    - Stuck Address : vérifie que chaque cellule mémoire est accessible 
-    - Random Value : écrit/lit des valeurs aléatoires 
-    - XOR comparison : détecte les bits "collés" 
+
+**Explication** :
+- **1G** : quantité à tester (limitée car l'OS tourne)
+- **5** : nombre de passes (répétitions du test)
+
+**Patterns de test** :
+- **Stuck Address** : vérifie que chaque cellule mémoire est accessible
+- **Random Value** : écrit/lit des valeurs aléatoires
+- **XOR comparison** : détecte les bits "collés"
+
 ### 2.5 Installation physique de RAM
-Avant l'installation
-RÈGLE D'OR : L'électricité statique TUE les composants électroniques !
-Préparation :
-    1. Éteignez : sudo shutdown -h now 
-    2. Débranchez l'alimentation 
-    3. Retirez la batterie 
-    4. Déchargez l'électricité statique : 
-        - Touchez une surface métallique reliée à la terre (radiateur, robinet) 
-        - Idéal : bracelet antistatique 
-Localisation sur Lenovo T420
+
+#### Avant l'installation
+
+**RÈGLE D'OR** : L'électricité statique TUE les composants électroniques !
+
+**Préparation** :
+1. Éteignez : `sudo shutdown -h now`
+2. Débranchez l'alimentation
+3. Retirez la batterie
+4. Déchargez l'électricité statique :
+   - Touchez une surface métallique reliée à la terre (radiateur, robinet)
+   - Idéal : bracelet antistatique
+
+#### Localisation sur T420
+
 Le T420 a ses slots RAM sous un capot au dos :
-    - Dévissez la trappe marquée d'une icône RAM 
-    - Les slots sont en "couloir" : un au-dessus de l'autre 
-Installation pas à pas
-    1. Retrait (si remplacement) : 
-        - Écartez les clips métalliques latéraux 
-        - La barrette se soulève à 45° 
-        - Tirez doucement dans l'axe 
-    2. Installation : 
-        - Vérifiez l'encoche sur la barrette (déportée, pas au centre) 
-        - Insérez à 45° dans le slot 
-        - Appuyez jusqu'à entendre un "clic" (clips verrouillés) 
-        - La barrette doit être horizontale 
-    3. Vérification post-installation : 
+- Dévissez la trappe marquée d'une icône RAM
+- Les slots sont en "couloir" : un au-dessus de l'autre
+
+#### Installation pas à pas
+
+1. **Retrait (si remplacement)** :
+   - Écartez les clips métalliques latéraux
+   - La barrette se soulève à 45°
+   - Tirez doucement dans l'axe
+
+2. **Installation** :
+   - Vérifiez l'encoche sur la barrette (déportée, pas au centre)
+   - Insérez à 45° dans le slot
+   - Appuyez jusqu'à entendre un "clic" (clips verrouillés)
+   - La barrette doit être horizontale
+
+3. **Vérification post-installation** :
+
 ```bash
-   # Après redémarrage
-   free -h
-   sudo dmidecode -t memory | grep -i size
-Compatibilité :
-    • DDR3 uniquement (DDR4 ne rentre physiquement pas) 
-    • Mixage possible mais déconseillé : préférez 2 barrettes identiques 
-    • Fréquence : le système s'adaptera à la plus lente 
+# Après redémarrage
+free -h
+sudo dmidecode -t memory | grep -i size
 ```
+
+**Compatibilité** :
+- DDR3 uniquement (DDR4 ne rentre physiquement pas)
+- Mixage possible mais déconseillé : préférez 2 barrettes identiques
+- Fréquence : le système s'adaptera à la plus lente
+
 ---
+
 ## 3. CPU - Processeur
-```text
-3. CPU - Processeur
-3.1 Architecture du processeur
+
+### 3.1 Architecture du processeur
+
 Le CPU est le cerveau de l'ordinateur. Le T420 utilise typiquement :
-    • Intel Core i5-2520M ou i7-2620M (génération Sandy Bridge) 
-    • Architecture : x86_64 (64 bits) 
-    • Cores : 2 cœurs physiques 
-    • Threads : 4 threads logiques (Hyper-Threading) 
-Qu'est-ce qu'un thread ? Imaginez un chef cuisinier (core) qui peut gérer 2 recettes en même temps (threads) en alternant rapidement les tâches.
-3.2 Informations détaillées
-Commande lscpu
-bash
+- Intel Core i5-2520M ou i7-2620M (génération Sandy Bridge)
+- **Architecture** : x86_64 (64 bits)
+- **Cores** : 2 cœurs physiques
+- **Threads** : 4 threads logiques (Hyper-Threading)
+
+**Qu'est-ce qu'un thread ?** Imaginez un chef cuisinier (core) qui peut gérer 2 recettes en même temps (threads) en alternant rapidement les tâches.
+
+### 3.2 Informations détaillées
+
+#### Commande lscpu
+
+```bash
 lscpu
-Sortie typique :
+```
+
+**Sortie typique** :
+```
 Architecture:        x86_64
 CPU op-mode(s):      32-bit, 64-bit
 Byte Order:          Little Endian
@@ -285,43 +316,51 @@ L1i cache:           32K
 L2 cache:            256K
 L3 cache:            3072K
 Flags:               fpu vme de pse ... (très longue liste)
-Décryptage ligne par ligne :
-    • Architecture: x86_64 : 
-        ◦ Processeur 64 bits (peut exécuter logiciels 32 et 64 bits) 
-        ◦ Comparé à ARM (smartphones) ou x86 (anciens 32 bits) 
-    • CPU(s): 4 : 
-        ◦ Le système voit 4 CPU logiques 
-        ◦ Calcul : 2 cores × 2 threads = 4 
-    • Thread(s) per core: 2 : 
-        ◦ Hyper-Threading activé 
-        ◦ Chaque cœur physique simule 2 cœurs logiques 
-    • CPU MHz: 1245.678 : 
-        ◦ Fréquence ACTUELLE (change en temps réel !) 
-        ◦ Varie entre min et max selon la charge 
-    • CPU max MHz: 3200 : 
-        ◦ Fréquence Turbo Boost maximale 
-        ◦ Atteinte sous forte charge (1 cœur) 
-    • CPU min MHz: 800 : 
-        ◦ Fréquence minimale (économie d'énergie au repos) 
-        ◦ Technologie : Intel SpeedStep 
-    • BogoMIPS: 4988.67 : 
-        ◦ "Bogus MIPS" = mesure approximative de vitesse 
-        ◦ Utile pour comparer des systèmes, pas une métrique absolue 
-    • Cache L1/L2/L3 : 
-        ◦ L1 : Cache le plus rapide mais le plus petit (32KB) 
-            ▪ Divisé en L1d (données) et L1i (instructions) 
-        ◦ L2 : Cache intermédiaire (256KB par cœur) 
-        ◦ L3 : Cache partagé entre cœurs (3MB total) 
-        ◦ Analogie : L1 = poche, L2 = sac à dos, L3 = coffre de voiture, RAM = garage 
-    • Flags : Capacités du CPU 
-        ◦ sse, sse2, sse4_2 : Instructions vectorielles (calculs parallèles) 
-        ◦ aes : Chiffrement AES matériel (plus rapide) 
-        ◦ vmx : Virtualisation matérielle (VT-x) 
-        ◦ lm : Long Mode = 64 bits supporté 
-Commande /proc/cpuinfo
-bash
+```
+
+**Décryptage ligne par ligne** :
+- **Architecture: x86_64** :
+  - Processeur 64 bits (peut exécuter logiciels 32 et 64 bits)
+  - Comparé à ARM (smartphones) ou x86 (anciens 32 bits)
+- **CPU(s): 4** :
+  - Le système voit 4 CPU logiques
+  - Calcul : 2 cores × 2 threads = 4
+- **Thread(s) per core: 2** :
+  - Hyper-Threading activé
+  - Chaque cœur physique simule 2 cœurs logiques
+- **CPU MHz: 1245.678** :
+  - Fréquence ACTUELLE (change en temps réel !)
+  - Varie entre min et max selon la charge
+- **CPU max MHz: 3200** :
+  - Fréquence Turbo Boost maximale
+  - Atteinte sous forte charge (1 cœur)
+- **CPU min MHz: 800** :
+  - Fréquence minimale (économie d'énergie au repos)
+  - Technologie : Intel SpeedStep
+- **BogoMIPS: 4988.67** :
+  - "Bogus MIPS" = mesure approximative de vitesse
+  - Utile pour comparer des systèmes, pas une métrique absolue
+- **Cache L1/L2/L3** :
+  - **L1** : Cache le plus rapide mais le plus petit (32KB)
+    - Divisé en L1d (données) et L1i (instructions)
+  - **L2** : Cache intermédiaire (256KB par cœur)
+  - **L3** : Cache partagé entre cœurs (3MB total)
+  - **Analogie** : L1 = poche, L2 = sac à dos, L3 = coffre de voiture, RAM = garage
+- **Flags** : Capacités du CPU
+  - `sse, sse2, sse4_2` : Instructions vectorielles (calculs parallèles)
+  - `aes` : Chiffrement AES matériel (plus rapide)
+  - `vmx` : Virtualisation matérielle (VT-x)
+  - `lm` : Long Mode = 64 bits supporté
+
+#### Commande /proc/cpuinfo
+
+```bash
 cat /proc/cpuinfo
+```
+
 Informations similaires mais format différent, un bloc par CPU logique :
+
+```
 processor       : 0
 vendor_id       : GenuineIntel
 cpu family      : 6
@@ -341,43 +380,59 @@ bogomips        : 4988.67
 clflush size    : 64
 cache_alignment : 64
 flags           : fpu vme de pse ...
-Nouveaux champs importants :
-    • processor: 0 : ID du CPU logique (0 à 3 sur votre système) 
-    • vendor_id: GenuineIntel : 
-        ◦ Fabricant (vs AuthenticAMD pour AMD) 
-    • cpu family: 6, model: 42 : 
-        ◦ Identifiants internes Intel 
-        ◦ Model 42 = Sandy Bridge (2ème génération Core) 
-    • stepping: 7 : 
-        ◦ Révision du processeur (corrections de bugs) 
-    • microcode: 0x2f : 
-        ◦ Version du microcode (firmware CPU) 
-        ◦ Updatable via : sudo dnf install microcode_ctl 
-    • physical id: 0 : 
-        ◦ ID du socket physique 
-        ◦ Toujours 0 sur laptop (1 seul CPU soudé) 
-    • core id: 0 ou 1 : 
-        ◦ ID du cœur physique 
-        ◦ Permet d'identifier les threads d'un même cœur 
-Astuce : Compter les cœurs physiques :
-bash
+```
+
+**Nouveaux champs importants** :
+- **processor: 0** : ID du CPU logique (0 à 3 sur votre système)
+- **vendor_id: GenuineIntel** :
+  - Fabricant (vs AuthenticAMD pour AMD)
+- **cpu family: 6, model: 42** :
+  - Identifiants internes Intel
+  - Model 42 = Sandy Bridge (2ème génération Core)
+- **stepping: 7** :
+  - Révision du processeur (corrections de bugs)
+- **microcode: 0x2f** :
+  - Version du microcode (firmware CPU)
+  - Updatable via : `sudo dnf install microcode_ctl`
+- **physical id: 0** :
+  - ID du socket physique
+  - Toujours 0 sur laptop (1 seul CPU soudé)
+- **core id: 0 ou 1** :
+  - ID du cœur physique
+  - Permet d'identifier les threads d'un même cœur
+
+**Astuce : Compter les cœurs physiques** :
+
+```bash
 cat /proc/cpuinfo | grep "core id" | sort -u | wc -l
-3.3 Surveillance de la température
-Installation des sensors
-bash
+```
+
+### 3.3 Surveillance de la température
+
+#### Installation des sensors
+
+```bash
 sudo dnf install lm_sensors
 sudo sensors-detect
-Le script sensors-detect :
-    • Scanne tous les capteurs de température disponibles 
-    • Propose de charger les modules nécessaires 
-    • Répondez YES à tout sauf si vous savez ce que vous faites 
-Pourquoi certaines questions ? :
-    • Certains vieux chipsets ont des bugs de détection 
-    • Le script vérifie la sécurité avant d'activer chaque capteur 
-Lecture des températures
-bash
+```
+
+**Le script sensors-detect** :
+- Scanne tous les capteurs de température disponibles
+- Propose de charger les modules nécessaires
+- Répondez YES à tout sauf si vous savez ce que vous faites
+
+**Pourquoi certaines questions ?** :
+- Certains vieux chipsets ont des bugs de détection
+- Le script vérifie la sécurité avant d'activer chaque capteur
+
+#### Lecture des températures
+
+```bash
 sensors
-Sortie typique :
+```
+
+**Sortie typique** :
+```
 coretemp-isa-0000
 Adapter: ISA adapter
 Package id 0:  +52.0°C  (high = +86.0°C, crit = +100.0°C)
@@ -390,79 +445,111 @@ fan1:        3200 RPM
 temp1:        +52.0°C
 temp2:        +48.0°C
 temp3:         +0.0°C
-Interprétation :
-    • Package id 0: +52°C : 
-        ◦ Température globale du CPU 
-        ◦ Zones : 
-            ▪ < 60°C : Excellent (utilisation légère) 
-            ▪ 60-80°C : Normal (charge moyenne) 
-            ▪ 80-90°C : Attention (charge élevée, vérifier ventilation) 
-            ▪ 90°C : DANGER (throttling imminent)
-    • high = +86°C : 
-        ◦ Température où le CPU commence à réduire sa fréquence (throttling) 
-    • crit = +100°C : 
-        ◦ Température d'extinction d'urgence (protection matérielle) 
-    • Core 0/1 : Température de chaque cœur physique 
-    • fan1: 3200 RPM : 
-        ◦ Vitesse du ventilateur en tours/minute 
-        ◦ Normal au repos : 2000-3000 RPM 
-        ◦ Charge élevée : 4000-5000 RPM 
-Surveillance en temps réel :
-bash
+```
+
+**Interprétation** :
+- **Package id 0: +52°C** :
+  - Température globale du CPU
+  - Zones :
+    - < 60°C : Excellent (utilisation légère)
+    - 60-80°C : Normal (charge moyenne)
+    - 80-90°C : Attention (charge élevée, vérifier ventilation)
+    - 90°C+ : DANGER (throttling imminent)
+- **high = +86°C** :
+  - Température où le CPU commence à réduire sa fréquence (throttling)
+- **crit = +100°C** :
+  - Température d'extinction d'urgence (protection matérielle)
+- **Core 0/1** : Température de chaque cœur physique
+- **fan1: 3200 RPM** :
+  - Vitesse du ventilateur en tours/minute
+  - Normal au repos : 2000-3000 RPM
+  - Charge élevée : 4000-5000 RPM
+
+**Surveillance en temps réel** :
+
+```bash
 watch -n 1 sensors
-    • Rafraîchit toutes les 1 seconde 
-    • Utile pendant un stress test 
-3.4 Fréquence du CPU
-Monitoring de la fréquence
-bash
+```
+
+- Rafraîchit toutes les 1 seconde
+- Utile pendant un stress test
+
+### 3.4 Fréquence du CPU
+
+#### Monitoring de la fréquence
+
+```bash
 watch -n 1 "grep 'MHz' /proc/cpuinfo"
-Pourquoi la fréquence varie ? :
-    • Intel SpeedStep : économie d'énergie 
-    • Au repos : 800 MHz (minimum) 
-    • Sous charge : monte progressivement 
-    • Turbo Boost : peut dépasser la fréquence de base (2.5 → 3.2 GHz) 
-Vérifier le gouverneur de fréquence :
-bash
+```
+
+**Pourquoi la fréquence varie ?** :
+- Intel SpeedStep : économie d'énergie
+- Au repos : 800 MHz (minimum)
+- Sous charge : monte progressivement
+- Turbo Boost : peut dépasser la fréquence de base (2.5 → 3.2 GHz)
+
+#### Vérifier le gouverneur de fréquence :
+
+```bash
 cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-Gouverneurs disponibles :
-    • powersave : maintient fréquence basse (économie maximale) 
-    • performance : maintient fréquence maximale 
-    • ondemand : ajuste selon la charge (défaut recommandé) 
-    • schedutil : gouverneur moderne basé sur le scheduler 
-Changer le gouverneur :
-bash
+```
+
+**Gouverneurs disponibles** :
+- **powersave** : maintient fréquence basse (économie maximale)
+- **performance** : maintient fréquence maximale
+- **ondemand** : ajuste selon la charge (défaut recommandé)
+- **schedutil** : gouverneur moderne basé sur le scheduler
+
+**Changer le gouverneur** :
+
+```bash
 echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-3.5 Tests de performance
-Test de charge : stress
-bash
+```
+
+### 3.5 Tests de performance
+
+#### Test de charge : stress
+
+```bash
 sudo dnf install stress
 
 # Stresser 2 cœurs pendant 60 secondes
 stress --cpu 2 --timeout 60s
-Options utiles :
-    • --cpu N : nombre de workers CPU 
-    • --io N : workers I/O (disque) 
-    • --vm N : workers mémoire 
-    • --timeout Xs : durée 
-Pendant le test, surveillez :
-bash
+```
+
+**Options utiles** :
+- `--cpu N` : nombre de workers CPU
+- `--io N` : workers I/O (disque)
+- `--vm N` : workers mémoire
+- `--timeout Xs` : durée
+
+**Pendant le test, surveillez** :
+
+```bash
 # Terminal 1
 stress --cpu 4 --timeout 120s
 
 # Terminal 2
 watch -n 1 "sensors && grep MHz /proc/cpuinfo | head -4"
-Ce que vous devez observer :
-    1. Fréquence monte vers le maximum 
-    2. Température augmente 
-    3. Ventilateur accélère 
-    4. Après quelques secondes, équilibre thermique atteint 
-Benchmark : sysbench
-bash
+```
+
+**Ce que vous devez observer** :
+1. Fréquence monte vers le maximum
+2. Température augmente
+3. Ventilateur accélère
+4. Après quelques secondes, équilibre thermique atteint
+
+#### Benchmark : sysbench
+
+```bash
 sudo dnf install sysbench
 
 # Test CPU : calcul de nombres premiers
 sysbench cpu --threads=4 --time=60 run
-Sortie :
+```
+
+**Sortie** :
+```
 CPU speed:
     events per second:   345.67
 
@@ -474,95 +561,134 @@ Latency (ms):
          min:        11.23
          avg:        11.58
          max:        15.89
-Interprétation :
-    • events per second : performance globale 
-        ◦ Plus élevé = mieux 
-        ◦ Comparez avant/après changement matériel 
-    • Latency avg : temps moyen par calcul 
-        ◦ Plus bas = mieux 
-3.6 Informations avancées
-Vérifier la virtualisation
-bash
+```
+
+**Interprétation** :
+- **events per second** : performance globale
+  - Plus élevé = mieux
+  - Comparez avant/après changement matériel
+- **Latency avg** : temps moyen par calcul
+  - Plus bas = mieux
+
+### 3.6 Informations avancées
+
+#### Vérifier la virtualisation
+
+```bash
 lscpu | grep Virtualization
-Résultat attendu :
+```
+
+**Résultat attendu** :
+```
 Virtualization:      VT-x
-    • VT-x (Intel) ou AMD-V (AMD) : support de la virtualisation matérielle 
-    • Nécessaire pour VMware, VirtualBox, KVM avec bonnes performances 
-    • Si absent : vérifiez dans le BIOS (peut être désactivé) 
-Vérifier les vulnérabilités
-bash
+```
+
+- **VT-x** (Intel) ou **AMD-V** (AMD) : support de la virtualisation matérielle
+- Nécessaire pour VMware, VirtualBox, KVM avec bonnes performances
+- Si absent : vérifiez dans le BIOS (peut être désactivé)
+
+#### Vérifier les vulnérabilités
+
+```bash
 lscpu | grep Vulnerability
-Exemple :
+```
+
+**Exemple** :
+```
 Vulnerability Meltdown:         Mitigation; PTI
 Vulnerability Spectre v1:       Mitigation; usercopy/swapgs barriers
 Vulnerability Spectre v2:       Mitigation; Full generic retpoline
-    • Meltdown/Spectre : vulnérabilités découvertes en 2018 
-    • Mitigation : corrections appliquées (légère perte de performance) 
-    • PTI : Page Table Isolation
 ```
+
+- **Meltdown/Spectre** : vulnérabilités découvertes en 2018
+- **Mitigation** : corrections appliquées (légère perte de performance)
+- **PTI** : Page Table Isolation
+
 ---
+
 ## 4. Disques durs et stockage
-```text
-4.1 Types de stockage
-HDD (Hard Disk Drive)
-Fonctionnement mécanique :
-    • Plateaux magnétiques tournant à 5400 ou 7200 RPM 
-    • Têtes de lecture/écriture se déplaçant physiquement 
-    • Avantages : Capacité élevée, prix bas 
-    • Inconvénients : Lent, fragile aux chocs, bruyant 
-SSD (Solid State Drive)
-Fonctionnement électronique :
-    • Mémoire flash (comme une clé USB géante) 
-    • Aucune pièce mobile 
-    • Avantages : Très rapide, silencieux, résistant aux chocs 
-    • Inconvénients : Prix plus élevé, usure limitée (cycles d'écriture) 
-Interfaces :
-    • SATA : 6 Gb/s max (votre T420) 
-    • NVMe : jusqu'à 32 Gb/s (nécessite slot M.2, absent sur T420) 
-4.2 Identification des disques
-Commande lsblk
-bash
+
+### 4.1 Types de stockage
+
+#### HDD (Hard Disk Drive)
+
+**Fonctionnement mécanique** :
+- Plateaux magnétiques tournant à 5400 ou 7200 RPM
+- Têtes de lecture/écriture se déplaçant physiquement
+- **Avantages** : Capacité élevée, prix bas
+- **Inconvénients** : Lent, fragile aux chocs, bruyant
+
+#### SSD (Solid State Drive)
+
+**Fonctionnement électronique** :
+- Mémoire flash (comme une clé USB géante)
+- Aucune pièce mobile
+- **Avantages** : Très rapide, silencieux, résistant aux chocs
+- **Inconvénients** : Prix plus élevé, usure limitée (cycles d'écriture)
+
+**Interfaces** :
+- **SATA** : 6 Gb/s max (votre T420)
+- **NVMe** : jusqu'à 32 Gb/s (nécessite slot M.2, absent sur T420)
+
+### 4.2 Identification des disques
+
+#### Commande lsblk
+
+```bash
 lsblk
-Sortie typique :
+```
+
+**Sortie typique** :
+```
 NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
 sda      8:0    0 232.9G  0 disk 
 ├─sda1   8:1    0   512M  0 part /boot
 ├─sda2   8:2    0  97.7G  0 part /
 └─sda3   8:3    0   7.8G  0 part [SWAP]
 sr0     11:0    1  1024M  0 rom
-Décryptage :
-    • NAME : Nom du périphérique 
-        ◦ sda : premier disque SATA (a = 1er, b = 2ème, etc.) 
-        ◦ sda1, sda2, sda3 : partitions sur sda 
-        ◦ sr0 : lecteur optique (DVD) 
-    • MAJ:MIN : Major:Minor numbers 
-        ◦ Identifiants uniques du kernel pour chaque périphérique 
-        ◦ 8:0 = disque SCSI/SATA, 8:1 = première partition 
-    • RM : Removable 
-        ◦ 0 = non amovible 
-        ◦ 1 = amovible (USB, carte SD) 
-    • SIZE : Taille 
-        ◦ 232.9G = capacité du disque 
-        ◦ 512M, 97.7G = taille de chaque partition 
-    • RO : Read-Only 
-        ◦ 0 = lecture/écriture 
-        ◦ 1 = lecture seule 
-    • TYPE : Type 
-        ◦ disk = disque entier 
-        ◦ part = partition 
-        ◦ rom = lecteur optique 
-    • MOUNTPOINT : Point de montage 
-        ◦ / = partition racine (système) 
-        ◦ /boot = fichiers de démarrage (kernel, initramfs) 
-        ◦ [SWAP] = espace d'échange (RAM virtuelle) 
-Options utiles :
-bash
+```
+
+**Décryptage** :
+- **NAME** : Nom du périphérique
+  - `sda` : premier disque SATA (a = 1er, b = 2ème, etc.)
+  - `sda1, sda2, sda3` : partitions sur sda
+  - `sr0` : lecteur optique (DVD)
+- **MAJ:MIN** : Major:Minor numbers
+  - Identifiants uniques du kernel pour chaque périphérique
+  - 8:0 = disque SCSI/SATA, 8:1 = première partition
+- **RM** : Removable
+  - 0 = non amovible
+  - 1 = amovible (USB, carte SD)
+- **SIZE** : Taille
+  - 232.9G = capacité du disque
+  - 512M, 97.7G = taille de chaque partition
+- **RO** : Read-Only
+  - 0 = lecture/écriture
+  - 1 = lecture seule
+- **TYPE** : Type
+  - disk = disque entier
+  - part = partition
+  - rom = lecteur optique
+- **MOUNTPOINT** : Point de montage
+  - `/` = partition racine (système)
+  - `/boot` = fichiers de démarrage (kernel, initramfs)
+  - `[SWAP]` = espace d'échange (RAM virtuelle)
+
+**Options utiles** :
+
+```bash
 lsblk -f  # Affiche les systèmes de fichiers
 lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT  # Colonnes personnalisées
-Commande fdisk
-bash
+```
+
+#### Commande fdisk
+
+```bash
 sudo fdisk -l
-Sortie :
+```
+
+**Sortie** :
+```
 Disk /dev/sda: 232.9 GiB, 250059350016 bytes, 488397168 sectors
 Disk model: Samsung SSD 850
 Units: sectors of 1 * 512 = 512 bytes
@@ -575,42 +701,53 @@ Device     Boot     Start       End   Sectors  Size Id Type
 /dev/sda1  *         2048   1050623   1048576  512M 83 Linux
 /dev/sda2         1050624 205824000 204773377 97.7G 83 Linux
 /dev/sda3       205824001 222220287  16396287  7.8G 82 Linux swap
-Nouvelles informations :
-    • Disk model: Samsung SSD 850 : 
-        ◦ Modèle exact du disque 
-        ◦ Utile pour vérifier la compatibilité, chercher des firmware updates 
-    • Sectors: 488397168 : 
-        ◦ Nombre total de secteurs 
-        ◦ 1 secteur = 512 octets traditionnellement 
-    • Sector size (logical/physical): 512 bytes / 512 bytes : 
-        ◦ Taille logique : ce que l'OS voit 
-        ◦ Taille physique : taille réelle sur le disque 
-        ◦ Certains disques modernes : 512/4096 (Advanced Format) 
-    • Disklabel type: dos : 
-        ◦ Type de table de partition 
-        ◦ dos = MBR (Master Boot Record) - ancien standard 
-        ◦ gpt = GPT (GUID Partition Table) - standard moderne 
-        ◦ MBR limite : 4 partitions primaires max, 2TB max 
-    • **Boot : *** : 
-        ◦ Partition bootable (contient le GRUB) 
-    • Start/End : Secteurs de début et fin 
-        ◦ Détermine l'emplacement physique sur le disque 
-    • Id : Type : 
-        ◦ 83 = Linux filesystem 
-        ◦ 82 = Linux swap 
-        ◦ 7 = NTFS (Windows) 
-        ◦ ef = EFI System 
-4.3 Santé du disque (SMART)
-Qu'est-ce que SMART ?
-S.M.A.R.T. = Self-Monitoring, Analysis and Reporting Technology
-    • Système intégré au disque 
-    • Surveille les paramètres de santé 
-    • Prévient les pannes imminentes 
-Vérification SMART
-bash
+```
+
+**Nouvelles informations** :
+- **Disk model: Samsung SSD 850** :
+  - Modèle exact du disque
+  - Utile pour vérifier la compatibilité, chercher des firmware updates
+- **Sectors: 488397168** :
+  - Nombre total de secteurs
+  - 1 secteur = 512 octets traditionnellement
+- **Sector size (logical/physical): 512 bytes / 512 bytes** :
+  - Taille logique : ce que l'OS voit
+  - Taille physique : taille réelle sur le disque
+  - Certains disques modernes : 512/4096 (Advanced Format)
+- **Disklabel type: dos** :
+  - Type de table de partition
+  - dos = MBR (Master Boot Record) - ancien standard
+  - gpt = GPT (GUID Partition Table) - standard moderne
+  - MBR limite : 4 partitions primaires max, 2TB max
+- **Boot : \*** :
+  - Partition bootable (contient le GRUB)
+- **Start/End** : Secteurs de début et fin
+  - Détermine l'emplacement physique sur le disque
+- **Id : Type** :
+  - 83 = Linux filesystem
+  - 82 = Linux swap
+  - 7 = NTFS (Windows)
+  - ef = EFI System
+
+### 4.3 Santé du disque (SMART)
+
+#### Qu'est-ce que SMART ?
+
+**S.M.A.R.T.** = Self-Monitoring, Analysis and Reporting Technology
+
+- Système intégré au disque
+- Surveille les paramètres de santé
+- Prévient les pannes imminentes
+
+#### Vérification SMART
+
+```bash
 sudo dnf install smartmontools
 sudo smartctl -a /dev/sda
-Sortie (extraits importants) :
+```
+
+**Sortie (extraits importants)** :
+```
 === START OF INFORMATION SECTION ===
 Model Family:     Samsung 850 EVO
 Device Model:     Samsung SSD 850 EVO 250GB
@@ -640,50 +777,63 @@ ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_
 199 CRC_Error_Count         0x003e   100   100   000    Old_age   Always       -       0
 235 POR_Recovery_Count      0x0012   099   099   000    Old_age   Always       -       45
 241 Total_LBAs_Written      0x0032   099   099   000    Old_age   Always       -       123456789
-Indicateurs CRITIQUES :
-    1. SMART overall-health: PASSED : 
-        ◦ PASSED = Disque sain 
-        ◦ FAILED = Remplacez IMMÉDIATEMENT le disque ! 
-    2. Reallocated_Sector_Ct (ID 5) : 
-        ◦ Secteurs défectueux remplacés 
-        ◦ VALUE: 100 = aucun secteur réalloué (parfait) 
-        ◦ Seuil critique : > 0 = début de dégradation 
-        ◦ > 10 = disque en fin de vie 
-    3. Power_On_Hours (ID 9) : 
-        ◦ Heures d'utilisation : 1234h 
-        ◦ Espérance de vie SSD : 20,000 - 50,000h 
-        ◦ HDD : 20,000 - 40,000h 
-    4. Wear_Leveling_Count (ID 177) : 
-        ◦ Usure globale du SSD 
-        ◦ 99% restant (excellent) 
-        ◦ < 10% = envisager le remplacement 
-    5. Used_Rsvd_Blk_Cnt_Tot (ID 179) : 
-        ◦ Blocs de réserve utilisés 
-        ◦ 0 = aucun (parfait) 
-        ◦ Augmentation = usure avancée 
-    6. Uncorrectable_Error_Cnt (ID 187) : 
-        ◦ Erreurs non corrigées 
-        ◦ DOIT être 0 
-        ◦ > 0 = perte de données possible ! 
-    7. Airflow_Temperature_Cel (ID 190) : 
-        ◦ Température : 26°C 
-        ◦ Normal : 20-50°C 
-        ◦ > 60°C = ventilation insuffisante 
-    8. Total_LBAs_Written (ID 241) : 
-        ◦ Quantité de données écrites (en blocs) 
-        ◦ Divisez par 2048 pour obtenir des GB 
-        ◦ Calcul TBW (TeraBytes Written) : santé du SSD 
-Décryptage des colonnes :
-    • VALUE : Valeur actuelle normalisée (0-100 ou 0-253) 
-    • WORST : Pire valeur jamais atteinte 
-    • THRESH : Seuil critique (si VALUE < THRESH = FAILED) 
-    • TYPE : 
-        ◦ Pre-fail : Prédictif de panne imminente 
-        ◦ Old_age : Usure normale 
-    • WHEN_FAILED : Quand l'attribut a échoué (idéalement "-") 
-    • RAW_VALUE : Valeur brute du fabricant 
-Tests SMART
-bash
+```
+
+**Indicateurs CRITIQUES** :
+
+1. **SMART overall-health: PASSED** :
+   - PASSED = Disque sain
+   - FAILED = Remplacez IMMÉDIATEMENT le disque !
+
+2. **Reallocated_Sector_Ct (ID 5)** :
+   - Secteurs défectueux remplacés
+   - VALUE: 100 = aucun secteur réalloué (parfait)
+   - Seuil critique : > 0 = début de dégradation
+   - > 10 = disque en fin de vie
+
+3. **Power_On_Hours (ID 9)** :
+   - Heures d'utilisation : 1234h
+   - Espérance de vie SSD : 20,000 - 50,000h
+   - HDD : 20,000 - 40,000h
+
+4. **Wear_Leveling_Count (ID 177)** :
+   - Usure globale du SSD
+   - 99% restant (excellent)
+   - < 10% = envisager le remplacement
+
+5. **Used_Rsvd_Blk_Cnt_Tot (ID 179)** :
+   - Blocs de réserve utilisés
+   - 0 = aucun (parfait)
+   - Augmentation = usure avancée
+
+6. **Uncorrectable_Error_Cnt (ID 187)** :
+   - Erreurs non corrigées
+   - DOIT être 0
+   - > 0 = perte de données possible !
+
+7. **Airflow_Temperature_Cel (ID 190)** :
+   - Température : 26°C
+   - Normal : 20-50°C
+   - > 60°C = ventilation insuffisante
+
+8. **Total_LBAs_Written (ID 241)** :
+   - Quantité de données écrites (en blocs)
+   - Divisez par 2048 pour obtenir des GB
+   - Calcul TBW (TeraBytes Written) : santé du SSD
+
+**Décryptage des colonnes** :
+- **VALUE** : Valeur actuelle normalisée (0-100 ou 0-253)
+- **WORST** : Pire valeur jamais atteinte
+- **THRESH** : Seuil critique (si VALUE < THRESH = FAILED)
+- **TYPE** :
+  - Pre-fail : Prédictif de panne imminente
+  - Old_age : Usure normale
+- **WHEN_FAILED** : Quand l'attribut a échoué (idéalement "-")
+- **RAW_VALUE** : Valeur brute du fabricant
+
+#### Tests SMART
+
+```bash
 # Test court (2 minutes)
 sudo smartctl -t short /dev/sda
 
@@ -692,199 +842,266 @@ sudo smartctl -l selftest /dev/sda
 
 # Test long (30-120 minutes selon taille)
 sudo smartctl -t long /dev/sda
-Résultat :
+```
+
+**Résultat** :
+```
 Num  Test_Description    Status                  Remaining  LifeTime(hours)  LBA_of_first_error
 # 1  Short offline       Completed without error       00%      1235         -
-    • Completed without error : Parfait ! 
-    • Completed: read failure : Secteurs défectueux 
-    • Aborted by host : Test interrompu (normal si vous avez redémarré) 
-4.4 Performance du disque
-Test de vitesse : hdparm
-bash
+```
+
+- **Completed without error** : Parfait !
+- **Completed: read failure** : Secteurs défectueux
+- **Aborted by host** : Test interrompu (normal si vous avez redémarré)
+
+### 4.4 Performance du disque
+
+#### Test de vitesse : hdparm
+
+```bash
 sudo dnf install hdparm
 sudo hdparm -Tt /dev/sda
-Sortie :
+```
+
+**Sortie** :
+```
 /dev/sda:
  Timing cached reads:   12000 MB in  2.00 seconds = 5998.23 MB/sec
  Timing buffered disk reads: 1284 MB in  3.00 seconds = 427.65 MB/sec
-Interprétation :
-    • Cached reads: 5998 MB/sec : 
-        ◦ Lecture depuis le cache mémoire 
-        ◦ Teste la vitesse de la RAM et du bus, pas du disque 
-        ◦ Normal : 3000-10000 MB/s 
-    • Buffered disk reads: 427 MB/sec : 
-        ◦ Lecture RÉELLE depuis le disque 
-        ◦ HDD 7200 RPM : 80-160 MB/s 
-        ◦ HDD 5400 RPM : 50-100 MB/s 
-        ◦ SSD SATA : 200-550 MB/s (votre cas) 
-        ◦ SSD NVMe : 1500-7000 MB/s 
-Test d'écriture (ATTENTION : destructif sur partition vide !) :
-bash
+```
+
+**Interprétation** :
+- **Cached reads: 5998 MB/sec** :
+  - Lecture depuis le cache mémoire
+  - Teste la vitesse de la RAM et du bus, pas du disque
+  - Normal : 3000-10000 MB/s
+- **Buffered disk reads: 427 MB/sec** :
+  - Lecture RÉELLE depuis le disque
+  - HDD 7200 RPM : 80-160 MB/s
+  - HDD 5400 RPM : 50-100 MB/s
+  - SSD SATA : 200-550 MB/s (votre cas)
+  - SSD NVMe : 1500-7000 MB/s
+
+**Test d'écriture (ATTENTION : destructif sur partition vide !)** :
+
+```bash
 # NE PAS FAIRE sur partition système !
 # Exemple sur une partition de test
 sudo dd if=/dev/zero of=/tmp/testfile bs=1G count=1 oflag=direct
-4.5 Gestion des partitions
-Voir les UUID
-bash
+```
+
+### 4.5 Gestion des partitions
+
+#### Voir les UUID
+
+```bash
 sudo blkid
-Sortie :
+```
+
+**Sortie** :
+```
 /dev/sda1: UUID="1234-5678" TYPE="vfat" PARTUUID="12345678-01"
 /dev/sda2: UUID="abcd-efgh-ijkl-mnop" TYPE="ext4" PARTUUID="12345678-02"
 /dev/sda3: UUID="wxyz-1234-5678-abcd" TYPE="swap" PARTUUID="12345678-03"
-UUID (Universally Unique IDentifier) :
-    • Identifiant unique de la partition (ne change jamais) 
-    • Utilisé dans /etc/fstab pour le montage automatique 
-    • Pourquoi UUID plutôt que /dev/sda1 ? : 
-        ◦ Si vous ajoutez un disque, sda peut devenir sdb 
-        ◦ UUID reste constant 
-TYPE : Système de fichiers
-    • ext4 : Standard Linux (journalisé, robuste) 
-    • xfs : Hautes performances (par défaut sur RHEL/AlmaLinux) 
-    • btrfs : Avancé (snapshots, compression) 
-    • vfat : FAT32 (compatible Windows/Mac/Linux) 
-    • ntfs : Windows (lecture/écriture avec driver supplémentaire) 
-Espace disque
-bash
+```
+
+**UUID (Universally Unique IDentifier)** :
+- Identifiant unique de la partition (ne change jamais)
+- Utilisé dans `/etc/fstab` pour le montage automatique
+- **Pourquoi UUID plutôt que /dev/sda1 ?** :
+  - Si vous ajoutez un disque, sda peut devenir sdb
+  - UUID reste constant
+
+**TYPE : Système de fichiers** :
+- **ext4** : Standard Linux (journalisé, robuste)
+- **xfs** : Hautes performances (par défaut sur RHEL/AlmaLinux)
+- **btrfs** : Avancé (snapshots, compression)
+- **vfat** : FAT32 (compatible Windows/Mac/Linux)
+- **ntfs** : Windows (lecture/écriture avec driver supplémentaire)
+
+#### Espace disque
+
+```bash
 df -h
-Sortie :
+```
+
+**Sortie** :
+```
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/sda2        96G   45G   47G  49% /
 /dev/sda1       511M  128M  384M  25% /boot
 tmpfs           3.9G  2.3M  3.9G   1% /run
 tmpfs           3.9G     0  3.9G   0% /dev/shm
-Colonnes :
-    • Filesystem : Partition 
-    • Size : Taille totale 
-    • Used : Espace utilisé 
-    • Avail : Espace disponible (pas exactement Size - Used à cause des blocs réservés) 
-    • Use% : Pourcentage d'utilisation 
-        ◦ > 90% : Attention, espace faible 
-        ◦ 100% : Plus d'espace libre, système instable ! 
-    • Mounted on : Point de montage 
-Systèmes de fichiers virtuels :
-    • tmpfs : Stockage en RAM (ultra-rapide, perdu au reboot) 
-        ◦ /run : Fichiers temporaires du système 
-        ◦ /dev/shm : Mémoire partagée 
-Trouver les gros fichiers :
-bash
+```
+
+**Colonnes** :
+- **Filesystem** : Partition
+- **Size** : Taille totale
+- **Used** : Espace utilisé
+- **Avail** : Espace disponible (pas exactement Size - Used à cause des blocs réservés)
+- **Use%** : Pourcentage d'utilisation
+  - > 90% : Attention, espace faible
+  - 100% : Plus d'espace libre, système instable !
+- **Mounted on** : Point de montage
+
+**Systèmes de fichiers virtuels** :
+- **tmpfs** : Stockage en RAM (ultra-rapide, perdu au reboot)
+  - `/run` : Fichiers temporaires du système
+  - `/dev/shm` : Mémoire partagée
+
+**Trouver les gros fichiers** :
+
+```bash
 # Taille de chaque répertoire dans /home
 du -sh /home/*
 
 # Top 10 des plus gros fichiers
 sudo find / -type f -size +100M -exec du -h {} \; | sort -rh | head -10
-4.6 Installation physique
-Disque principal (slot SATA)
-Localisation T420 :
-    • Sous le laptop, trappe à vis (symbole disque) 
-    • Ou : retirer le clavier, dévisser caddy 
-Procédure :
-    1. Éteignez et déchargez l'électricité statique 
-    2. Retirez la batterie 
-    3. Dévissez la trappe 
-    4. Dégagez le caddy (rail métallique) 
-    5. Dévissez le disque du caddy (4 vis latérales) 
-    6. Installez le nouveau disque (mêmes vis) 
-    7. Réinsérez le caddy jusqu'au "clic" 
-Compatibilité :
-    • Format : 2.5" (laptop standard) 
-    • Épaisseur : 7mm ou 9.5mm (les deux fonctionnent) 
-    • Interface : SATA III (6 Gb/s) rétrocompatible SATA II 
-Disque secondaire (Ultrabay)
-Utilisation créative : Le T420 a un lecteur DVD amovible (Ultrabay). Vous pouvez le remplacer par un caddy HDD/SSD !
-Produit : Cherchez "Ultrabay HDD Caddy T420" (12mm d'épaisseur)
-Installation :
-    1. Dévissez la vis de verrouillage Ultrabay (logo DVD) 
-    2. Glissez le lecteur DVD hors du slot 
-    3. Retirez la façade du lecteur DVD 
-    4. Installez la façade sur le caddy HDD 
-    5. Installez le SSD/HDD dans le caddy 
-    6. Insérez le caddy dans l'Ultrabay 
-Configuration DUAL BOOT avancée :
-    • SSD principal : AlmaLinux 
-    • HDD secondaire : Windows ou stockage de données 
 ```
+
+### 4.6 Installation physique
+
+#### Disque principal (slot SATA)
+
+**Localisation T420** :
+- Sous le laptop, trappe à vis (symbole disque)
+- Ou : retirer le clavier, dévisser caddy
+
+**Procédure** :
+1. Éteignez et déchargez l'électricité statique
+2. Retirez la batterie
+3. Dévissez la trappe
+4. Dégagez le caddy (rail métallique)
+5. Dévissez le disque du caddy (4 vis latérales)
+6. Installez le nouveau disque (mêmes vis)
+7. Réinsérez le caddy jusqu'au "clic"
+
+**Compatibilité** :
+- **Format** : 2.5" (laptop standard)
+- **Épaisseur** : 7mm ou 9.5mm (les deux fonctionnent)
+- **Interface** : SATA III (6 Gb/s) rétrocompatible SATA II
+
+#### Disque secondaire (Ultrabay)
+
+**Utilisation créative** : Le T420 a un lecteur DVD amovible (Ultrabay). Vous pouvez le remplacer par un caddy HDD/SSD !
+
+**Produit** : Cherchez "Ultrabay HDD Caddy T420" (12mm d'épaisseur)
+
+**Installation** :
+1. Dévissez la vis de verrouillage Ultrabay (logo DVD)
+2. Glissez le lecteur DVD hors du slot
+3. Retirez la façade du lecteur DVD
+4. Installez la façade sur le caddy HDD
+5. Installez le SSD/HDD dans le caddy
+6. Insérez le caddy dans l'Ultrabay
+
+**Configuration DUAL BOOT avancée** :
+- SSD principal : AlmaLinux
+- HDD secondaire : Windows ou stockage de données
+
 ---
+
 ## 5. Carte réseau
-```text
-5. Carte réseau
-5.1 Architecture réseau
+
+### 5.1 Architecture réseau
+
 Votre T420 possède généralement :
-    1. Carte Ethernet : Intel 82579LM (1 Gigabit) 
-    2. Carte WiFi : Intel Centrino Advanced-N 6205 (dual-band) 
-5.2 Identification
-Lister les interfaces
-bash
+1. **Carte Ethernet** : Intel 82579LM (1 Gigabit)
+2. **Carte WiFi** : Intel Centrino Advanced-N 6205 (dual-band)
+
+### 5.2 Identification
+
+#### Lister les interfaces
+
+```bash
 ip link show
-Sortie typique :
+```
+
+**Sortie typique** :
+```
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 2: enp0s25: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
     link/ether 00:21:cc:d4:5e:7f brd ff:ff:ff:ff:ff:ff
 3: wlp3s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DORMANT group default qlen 1000
     link/ether 84:3a:4b:12:34:56 brd ff:ff:ff:ff:ff:ff
-Décryptage :
-    • lo : Loopback 
-        ◦ Interface virtuelle (127.0.0.1) 
-        ◦ Communication interne à la machine 
-        ◦ Toujours présente 
-    • enp0s25 : Ethernet 
-        ◦ Nouveau nommage : e(thernet) n(nom) p0(bus PCI) s25(slot) 
-        ◦ Ancien nom : eth0 
-        ◦ Pourquoi ce changement ? : Noms prévisibles et stables 
-    • wlp3s0 : WiFi 
-        ◦ w(ireless) l(an) p3(bus PCI) s0(slot) 
-        ◦ Ancien nom : wlan0 
-    • État : 
-        ◦ <UP> : Interface activée 
-        ◦ <LOWER_UP> : Câble branché (Ethernet) ou connecté (WiFi) 
-        ◦ state UP : Pleinement fonctionnelle 
-        ◦ state DOWN : Désactivée 
-    • MTU 1500 : Maximum Transmission Unit 
-        ◦ Taille maximale d'un paquet : 1500 octets 
-        ◦ Standard Ethernet 
-        ◦ Jumbo frames : jusqu'à 9000 (rare, réseaux spécialisés) 
-    • qdisc fq_codel : Queue Discipline 
-        ◦ Algorithme de gestion de la file d'attente 
-        ◦ fq_codel : Fair Queuing avec CoDel (réduit latence) 
-    • link/ether 00:21:cc:d4:5e:7f : Adresse MAC 
-        ◦ Media Access Control 
-        ◦ Adresse physique unique au monde 
-        ◦ 6 octets en hexadécimal 
-        ◦ 00:21:cc = OUI (Organizationally Unique Identifier) - identifie Intel 
-Informations IP
-bash
+```
+
+**Décryptage** :
+- **lo** : Loopback
+  - Interface virtuelle (127.0.0.1)
+  - Communication interne à la machine
+  - Toujours présente
+- **enp0s25** : Ethernet
+  - Nouveau nommage : e(thernet) n(nom) p0(bus PCI) s25(slot)
+  - Ancien nom : eth0
+  - Pourquoi ce changement ? : Noms prévisibles et stables
+- **wlp3s0** : WiFi
+  - w(ireless) l(an) p3(bus PCI) s0(slot)
+  - Ancien nom : wlan0
+- **État** :
+  - `<UP>` : Interface activée
+  - `<LOWER_UP>` : Câble branché (Ethernet) ou connecté (WiFi)
+  - `state UP` : Pleinement fonctionnelle
+  - `state DOWN` : Désactivée
+- **MTU 1500** : Maximum Transmission Unit
+  - Taille maximale d'un paquet : 1500 octets
+  - Standard Ethernet
+  - Jumbo frames : jusqu'à 9000 (rare, réseaux spécialisés)
+- **qdisc fq_codel** : Queue Discipline
+  - Algorithme de gestion de la file d'attente
+  - fq_codel : Fair Queuing avec CoDel (réduit latence)
+- **link/ether 00:21:cc:d4:5e:7f** : Adresse MAC
+  - Media Access Control
+  - Adresse physique unique au monde
+  - 6 octets en hexadécimal
+  - 00:21:cc = OUI (Organizationally Unique Identifier) - identifie Intel
+
+#### Informations IP
+
+```bash
 ip addr show
-Sortie :
+```
+
+**Sortie** :
+```
 2: enp0s25: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
     link/ether 00:21:cc:d4:5e:7f brd ff:ff:ff:ff:ff:ff
     inet 192.168.1.42/24 brd 192.168.1.255 scope global dynamic noprefixroute enp0s25
        valid_lft 86234sec preferred_lft 86234sec
     inet6 fe80::221:ccff:fed4:5e7f/64 scope link noprefixroute 
        valid_lft forever preferred_lft forever
-Nouvelles infos :
-    • inet 192.168.1.42/24 : 
-        ◦ Adresse IPv4 : 192.168.1.42 
-        ◦ / 24 : Masque de sous-réseau (255.255.255.0) 
-            ▪ 24 premiers bits = réseau 
-            ▪ 8 derniers bits = hôtes (254 adresses disponibles) 
-    • brd 192.168.1.255 : Adresse de broadcast 
-        ◦ Envoyer à tous les appareils du réseau 
-    • scope global : Portée 
-        ◦ global : routée vers Internet 
-        ◦ link : locale au lien physique 
-        ◦ host : locale à la machine 
-    • dynamic : Adresse obtenue via DHCP 
-        ◦ Vs static : configurée manuellement 
-    • valid_lft 86234sec : Durée de validité 
-        ◦ Bail DHCP : 86234 secondes (≈ 24h) 
-        ◦ Renouvellement automatique 
-    • inet6 fe80::... : Adresse IPv6 link-local 
-        ◦ Autoconfiguration automatique 
-        ◦ Communication locale seulement 
-Détails matériels
-bash
+```
+
+**Nouvelles infos** :
+- **inet 192.168.1.42/24** :
+  - Adresse IPv4 : 192.168.1.42
+  - / 24 : Masque de sous-réseau (255.255.255.0)
+    - 24 premiers bits = réseau
+    - 8 derniers bits = hôtes (254 adresses disponibles)
+- **brd 192.168.1.255** : Adresse de broadcast
+  - Envoyer à tous les appareils du réseau
+- **scope global** : Portée
+  - global : routée vers Internet
+  - link : locale au lien physique
+  - host : locale à la machine
+- **dynamic** : Adresse obtenue via DHCP
+  - Vs static : configurée manuellement
+- **valid_lft 86234sec** : Durée de validité
+  - Bail DHCP : 86234 secondes (≈ 24h)
+  - Renouvellement automatique
+- **inet6 fe80::...** : Adresse IPv6 link-local
+  - Autoconfiguration automatique
+  - Communication locale seulement
+
+#### Détails matériels
+
+```bash
 sudo lshw -C network
-Sortie :
+```
+
+**Sortie** :
+```
   *-network
        description: Ethernet interface
        product: 82579LM Gigabit Network Connection
@@ -901,26 +1118,34 @@ Sortie :
        capabilities: ethernet physical tp 10bt 10bt-fd 100bt 100bt-fd 1000bt-fd autonegotiation
        configuration: autonegotiation=on broadcast=yes driver=e1000e driverversion=5.14.0 duplex=full firmware=0.13-4 latency=0 link=yes multicast=yes port=twisted pair speed=1Gbit/s
        resources: irq:31 memory:f2500000-f251ffff memory:f253b000-f253bfff ioport:5080(size=32)
-Informations clés :
-    • product: 82579LM : Modèle exact de la carte 
-    • vendor: Intel Corporation : Fabricant 
-    • bus info: pci@0000:00:19.0 : Emplacement PCI 
-    • size: 1Gbit/s : Vitesse actuelle de connexion 
-    • capacity: 1Gbit/s : Vitesse maximale supportée 
-    • capabilities : 
-        ◦ 10bt, 100bt, 1000bt-fd : Supporte 10/100/1000 Mbps full-duplex 
-        ◦ autonegotiation : Détection automatique de vitesse 
-        ◦ tp : Twisted Pair (câble RJ45 standard) 
-    • driver=e1000e : Driver utilisé 
-    • driverversion=5.14.0 : Version du kernel où le driver est compilé 
-    • duplex=full : Communication bidirectionnelle simultanée 
-        ◦ half : un sens à la fois (ancien) 
-    • link=yes : Câble connecté 
-5.3 Tests de connectivité
-Ping basique
-bash
+```
+
+**Informations clés** :
+- **product: 82579LM** : Modèle exact de la carte
+- **vendor: Intel Corporation** : Fabricant
+- **bus info: pci@0000:00:19.0** : Emplacement PCI
+- **size: 1Gbit/s** : Vitesse actuelle de connexion
+- **capacity: 1Gbit/s** : Vitesse maximale supportée
+- **capabilities** :
+  - 10bt, 100bt, 1000bt-fd : Supporte 10/100/1000 Mbps full-duplex
+  - autonegotiation : Détection automatique de vitesse
+  - tp : Twisted Pair (câble RJ45 standard)
+- **driver=e1000e** : Driver utilisé
+- **driverversion=5.14.0** : Version du kernel où le driver est compilé
+- **duplex=full** : Communication bidirectionnelle simultanée
+  - half : un sens à la fois (ancien)
+- **link=yes** : Câble connecté
+
+### 5.3 Tests de connectivité
+
+#### Ping basique
+
+```bash
 ping -c 4 8.8.8.8
-Sortie :
+```
+
+**Sortie** :
+```
 PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
 64 bytes from 8.8.8.8: icmp_seq=1 ttl=115 time=12.4 ms
 64 bytes from 8.8.8.8: icmp_seq=2 ttl=115 time=11.8 ms
@@ -930,49 +1155,65 @@ PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
 --- 8.8.8.8 ping statistics ---
 4 packets transmitted, 4 received, 0% packet loss, time 3005ms
 rtt min/avg/max/mdev = 11.827/12.325/13.098/0.501 ms
-Analyse :
-    • 8.8.8.8 : DNS Google (test de connexion Internet) 
-    • 64 bytes : Taille du paquet ICMP 
-    • icmp_seq : Numéro de séquence (détecte paquets manquants) 
-    • ttl=115 : Time To Live 
-        ◦ Nombre de sauts réseau restants (max 255) 
-        ◦ 115 = environ 10-12 sauts depuis vous 
-    • time=12.4 ms : Latence (ping) 
-        ◦ < 20 ms : Excellent (réseau local ou proche) 
-        ◦ 20-50 ms : Bon 
-        ◦ 50-100 ms : Moyen 
-        ◦ > 100 ms : Lent 
-        ◦ > 300 ms : Très lent (réseau saturé ou distant) 
-    • 0% packet loss : Aucune perte de paquets (parfait) 
-        ◦ > 5% : Problème réseau 
-    • rtt : Round-Trip Time 
-        ◦ min : meilleur ping 
-        ◦ avg : moyenne (indicateur principal) 
-        ◦ max : pire ping 
-        ◦ mdev : écart-type (stabilité) 
-Traceroute
-bash
+```
+
+**Analyse** :
+- **8.8.8.8** : DNS Google (test de connexion Internet)
+- **64 bytes** : Taille du paquet ICMP
+- **icmp_seq** : Numéro de séquence (détecte paquets manquants)
+- **ttl=115** : Time To Live
+  - Nombre de sauts réseau restants (max 255)
+  - 115 = environ 10-12 sauts depuis vous
+- **time=12.4 ms** : Latence (ping)
+  - < 20 ms : Excellent (réseau local ou proche)
+  - 20-50 ms : Bon
+  - 50-100 ms : Moyen
+  - > 100 ms : Lent
+  - > 300 ms : Très lent (réseau saturé ou distant)
+- **0% packet loss** : Aucune perte de paquets (parfait)
+  - > 5% : Problème réseau
+- **rtt** : Round-Trip Time
+  - min : meilleur ping
+  - avg : moyenne (indicateur principal)
+  - max : pire ping
+  - mdev : écart-type (stabilité)
+
+#### Traceroute
+
+```bash
 traceroute 8.8.8.8
-Sortie :
+```
+
+**Sortie** :
+```
 traceroute to 8.8.8.8 (8.8.8.8), 30 hops max, 60 byte packets
  1  _gateway (192.168.1.1)  2.451 ms  2.123 ms  2.045 ms
  2  10.0.0.1 (10.0.0.1)  8.234 ms  8.123 ms  8.456 ms
  3  72.14.204.1 (72.14.204.1)  12.345 ms  12.123 ms  12.567 ms
  4  * * *
  5  8.8.8.8 (8.8.8.8)  13.456 ms  13.234 ms  13.678 ms
-Interprétation :
-    • Chaque ligne = un saut (routeur traversé) 
-    • 1 _gateway (192.168.1.1) : Votre box/routeur 
-    • 2 10.0.0.1 : Premier routeur de votre FAI 
-    • 3 72.14.204.1 : Routeur Google 
-    • **4 * * *** : Routeur ne répond pas (normal, sécurité) 
-    • 5 8.8.8.8 : Destination atteinte 
-3 temps affichés : 3 paquets envoyés pour fiabilité
-5.4 Vitesse et performances
-ethtool
-bash
+```
+
+**Interprétation** :
+- Chaque ligne = un saut (routeur traversé)
+- 1 _gateway (192.168.1.1) : Votre box/routeur
+- 2 10.0.0.1 : Premier routeur de votre FAI
+- 3 72.14.204.1 : Routeur Google
+- **4 \* \* \*** : Routeur ne répond pas (normal, sécurité)
+- 5 8.8.8.8 : Destination atteinte
+
+**3 temps affichés** : 3 paquets envoyés pour fiabilité
+
+### 5.4 Vitesse et performances
+
+#### ethtool
+
+```bash
 sudo ethtool enp0s25
-Sortie :
+```
+
+**Sortie** :
+```
 Settings for enp0s25:
         Supported ports: [ TP ]
         Supported link modes:   10baseT/Half 10baseT/Full
@@ -991,72 +1232,96 @@ Settings for enp0s25:
         Auto-negotiation: on
         Port: Twisted Pair
         Link detected: yes
-Points importants :
-    • Speed: 1000Mb/s : Connecté à 1 Gigabit 
-        ◦ Si 100Mb/s : Câble défectueux ou switch ancien 
-        ◦ Si 10Mb/s : Gros problème ! 
-    • Duplex: Full : Communication bidirectionnelle 
-        ◦ Half = problème de négociation 
-    • Link detected: yes : Câble physiquement connecté 
-Statistiques d'interface
-bash
+```
+
+**Points importants** :
+- **Speed: 1000Mb/s** : Connecté à 1 Gigabit
+  - Si 100Mb/s : Câble défectueux ou switch ancien
+  - Si 10Mb/s : Gros problème !
+- **Duplex: Full** : Communication bidirectionnelle
+  - Half = problème de négociation
+- **Link detected: yes** : Câble physiquement connecté
+
+#### Statistiques d'interface
+
+```bash
 ip -s link show enp0s25
-Sortie :
+```
+
+**Sortie** :
+```
 2: enp0s25: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
     link/ether 00:21:cc:d4:5e:7f brd ff:ff:ff:ff:ff:ff
     RX: bytes  packets  errors  dropped overrun mcast   
     12345678   9876     0       0       0       123     
     TX: bytes  packets  errors  dropped carrier collsns 
     98765432   8765     0       0       0       0
-RX (Receive - Réception) :
-    • bytes : Données reçues (12.3 MB) 
-    • packets : Nombre de paquets (9876) 
-    • errors : Erreurs de transmission 
-        ◦ > 0 : Problème physique (câble, carte) 
-    • dropped : Paquets abandonnés (buffer plein) 
-    • overrun : Carte surchargée (impossible de traiter) 
-    • mcast : Paquets multicast 
-TX (Transmit - Émission) :
-    • carrier : Perte de signal physique 
-    • collsns : Collisions (ancien Ethernet half-duplex) 
-Si errors > 0 :
-    1. Vérifiez le câble 
-    2. Testez un autre port sur le switch 
-    3. Suspectez la carte réseau 
-5.5 WiFi spécifique
-Scanner les réseaux
-bash
+```
+
+**RX (Receive - Réception)** :
+- **bytes** : Données reçues (12.3 MB)
+- **packets** : Nombre de paquets (9876)
+- **errors** : Erreurs de transmission
+  - > 0 : Problème physique (câble, carte)
+- **dropped** : Paquets abandonnés (buffer plein)
+- **overrun** : Carte surchargée (impossible de traiter)
+- **mcast** : Paquets multicast
+
+**TX (Transmit - Émission)** :
+- **carrier** : Perte de signal physique
+- **collsns** : Collisions (ancien Ethernet half-duplex)
+
+**Si errors > 0** :
+1. Vérifiez le câble
+2. Testez un autre port sur le switch
+3. Suspectez la carte réseau
+
+### 5.5 WiFi spécifique
+
+#### Scanner les réseaux
+
+```bash
 sudo nmcli dev wifi list
-Sortie :
+```
+
+**Sortie** :
+```
 IN-USE  BSSID              SSID            MODE   CHAN  RATE        SIGNAL  BARS  SECURITY
 *       AA:BB:CC:DD:EE:FF  MonReseau       Infra  6     130 Mbit/s  87      ▂▄▆█  WPA2
         11:22:33:44:55:66  Voisin-WiFi     Infra  11    54 Mbit/s   42      ▂▄__  WPA2
         77:88:99:AA:BB:CC  FreeWiFi        Infra  1     54 Mbit/s   35      ▂___  --
-Colonnes :
-    • **IN-USE : *** : Réseau actuellement connecté 
-    • BSSID : Adresse MAC du point d'accès (AP) 
-    • SSID : Nom du réseau 
-    • MODE: Infra : Mode infrastructure (vs Ad-hoc) 
-    • CHAN : Canal WiFi 
-        ◦ 2.4 GHz : Canaux 1-13 
-            ▪ Canaux sans chevauchement : 1, 6, 11 
-            ▪ Évitez les autres pour réduire interférences 
-        ◦ 5 GHz : Canaux 36-165 
-    • RATE : Vitesse maximale négociée 
-    • SIGNAL : Puissance du signal (0-100) 
-        ◦ > 70 : Excellent 
-        ◦ 50-70 : Bon 
-        ◦ 30-50 : Moyen 
-        ◦ < 30 : Faible (déconnexions possibles) 
-    • SECURITY : 
-        ◦ WPA2 : Sécurisé (AES) 
-        ◦ WPA : Ancien, moins sécurisé 
-        ◦ WEP : Obsolète, facilement cassable 
-        ◦ -- : Ouvert (non sécurisé) 
-Informations de connexion WiFi
-bash
+```
+
+**Colonnes** :
+- **IN-USE : \*** : Réseau actuellement connecté
+- **BSSID** : Adresse MAC du point d'accès (AP)
+- **SSID** : Nom du réseau
+- **MODE: Infra** : Mode infrastructure (vs Ad-hoc)
+- **CHAN** : Canal WiFi
+  - 2.4 GHz : Canaux 1-13
+    - Canaux sans chevauchement : 1, 6, 11
+    - Évitez les autres pour réduire interférences
+  - 5 GHz : Canaux 36-165
+- **RATE** : Vitesse maximale négociée
+- **SIGNAL** : Puissance du signal (0-100)
+  - > 70 : Excellent
+  - 50-70 : Bon
+  - 30-50 : Moyen
+  - < 30 : Faible (déconnexions possibles)
+- **SECURITY** :
+  - WPA2 : Sécurisé (AES)
+  - WPA : Ancien, moins sécurisé
+  - WEP : Obsolète, facilement cassable
+  - -- : Ouvert (non sécurisé)
+
+#### Informations de connexion WiFi
+
+```bash
 nmcli dev show wlp3s0
-Sortie (extraits) :
+```
+
+**Sortie (extraits)** :
+```
 GENERAL.DEVICE:                         wlp3s0
 GENERAL.TYPE:                           wifi
 GENERAL.HWADDR:                         84:3A:4B:12:34:56
@@ -1072,71 +1337,101 @@ WIFI-PROPERTIES.SSID:                   MonReseau
 WIFI-PROPERTIES.MODE:                   infrastructure
 WIFI-PROPERTIES.RATE:                   130000 Kbit/s
 WIFI-PROPERTIES.SIGNAL:                 87
-    • FREQ: 2437 MHz : 
-        ◦ Fréquence WiFi 
-        ◦ 2400-2483 MHz : bande 2.4 GHz (canal 1-13) 
-        ◦ 5170-5825 MHz : bande 5 GHz 
-        ◦ Calcul du canal : (2437 - 2407) / 5 = Canal 6 
-    • RATE: 130000 Kbit/s : 130 Mbps (vitesse de liaison) 
-Qualité du signal en temps réel
-bash
+```
+
+- **FREQ: 2437 MHz** :
+  - Fréquence WiFi
+  - 2400-2483 MHz : bande 2.4 GHz (canal 1-13)
+  - 5170-5825 MHz : bande 5 GHz
+  - Calcul du canal : (2437 - 2407) / 5 = Canal 6
+- **RATE: 130000 Kbit/s** : 130 Mbps (vitesse de liaison)
+
+#### Qualité du signal en temps réel
+
+```bash
 watch -n 1 "cat /proc/net/wireless"
-Sortie :
+```
+
+**Sortie** :
+```
 Inter-| sta-|   Quality        |   Discarded packets               | Missed | WE
  face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22
 wlp3s0: 0000   67.  -43.  -256        0      0      0      0      0        0
-    • link: 67 : Qualité sur 70 (excellent) 
-    • level: -43 : Puissance en dBm 
-        ◦ -30 dBm : Signal parfait (très proche) 
-        ◦ -50 dBm : Excellent 
-        ◦ -60 dBm : Bon 
-        ◦ -70 dBm : Faible 
-        ◦ -80 dBm : Très faible 
-        ◦ < -90 dBm : Inutilisable 
-    • retry : Paquets retransmis 
-        ◦ > 0 : Interférences ou signal faible 
-5.6 Installation physique
-Carte WiFi (T420)
-Localisation :
-    • Sous le clavier (retirer 7 vis marquées) 
-    • Carte Mini PCIe demi-hauteur 
-Whitelist BIOS : ⚠️ ATTENTION : Lenovo a une "whitelist" de cartes WiFi autorisées dans le BIOS !
-    • Seules certaines cartes Intel/Realtek sont acceptées 
-    • Une carte non listée = refus de boot 
-Solutions :
-    1. Acheter une carte de la whitelist (Intel 6300, 6205, 7260) 
-    2. Flasher un BIOS modifié (avancé, risqué) 
-Installation :
-    1. Retirez le clavier (7 vis) 
-    2. Soulevez le clavier délicatement (nappes attachées) 
-    3. Repérez la carte WiFi (coin supérieur droit) 
-    4. Débranchez les 2 antennes (connecteurs minuscules) 
-        ◦ Main : Câble noir 
-        ◦ Aux : Câble blanc 
-    5. Dévissez la vis de maintien 
-    6. Retirez la carte à 30° 
-    7. Insérez la nouvelle carte (encoches alignées) 
-    8. Reconnectez les antennes (pas de force !) 
 ```
+
+- **link: 67** : Qualité sur 70 (excellent)
+- **level: -43** : Puissance en dBm
+  - -30 dBm : Signal parfait (très proche)
+  - -50 dBm : Excellent
+  - -60 dBm : Bon
+  - -70 dBm : Faible
+  - -80 dBm : Très faible
+  - < -90 dBm : Inutilisable
+- **retry** : Paquets retransmis
+  - > 0 : Interférences ou signal faible
+
+### 5.6 Installation physique
+
+#### Carte WiFi (T420)
+
+**Localisation** :
+- Sous le clavier (retirer 7 vis marquées)
+- Carte Mini PCIe demi-hauteur
+
+**Whitelist BIOS** : ⚠️ ATTENTION : Lenovo a une "whitelist" de cartes WiFi autorisées dans le BIOS !
+
+- Seules certaines cartes Intel/Realtek sont acceptées
+- Une carte non listée = refus de boot
+
+**Solutions** :
+1. Acheter une carte de la whitelist (Intel 6300, 6205, 7260)
+2. Flasher un BIOS modifié (avancé, risqué)
+
+**Installation** :
+1. Retirez le clavier (7 vis)
+2. Soulevez le clavier délicatement (nappes attachées)
+3. Repérez la carte WiFi (coin supérieur droit)
+4. Débranchez les 2 antennes (connecteurs minuscules)
+   - Main : Câble noir
+   - Aux : Câble blanc
+5. Dévissez la vis de maintien
+6. Retirez la carte à 30°
+7. Insérez la nouvelle carte (encoches alignées)
+8. Reconnectez les antennes (pas de force !)
+
 ---
+
 ## 6. Écran et affichage
-```text
-6.1 Architecture graphique
+
+### 6.1 Architecture graphique
+
 Votre T420 a :
-    • GPU intégré : Intel HD Graphics 3000 (dans le CPU) 
-    • Écran : 14.0" LED, 1366×768 ou 1600×900 (selon modèle) 
-    • Connecteurs : VGA, DisplayPort 
-6.2 Informations sur la carte graphique
-bash
+- **GPU intégré** : Intel HD Graphics 3000 (dans le CPU)
+- **Écran** : 14.0" LED, 1366×768 ou 1600×900 (selon modèle)
+- **Connecteurs** : VGA, DisplayPort
+
+### 6.2 Informations sur la carte graphique
+
+```bash
 lspci | grep -i vga
-Sortie :
+```
+
+**Sortie** :
+```
 00:02.0 VGA compatible controller: Intel Corporation 2nd Generation Core Processor Family Integrated Graphics Controller (rev 09)
-    • 00:02.0 : Adresse PCI 
-    • 2nd Generation Core : Sandy Bridge (2011) 
-Détails complets :
-bash
+```
+
+- **00:02.0** : Adresse PCI
+- **2nd Generation Core** : Sandy Bridge (2011)
+
+**Détails complets** :
+
+```bash
 sudo lshw -C display
-Sortie :
+```
+
+**Sortie** :
+```
   *-display
        description: VGA compatible controller
        product: 2nd Generation Core Processor Family Integrated Graphics Controller
@@ -1149,12 +1444,19 @@ Sortie :
        capabilities: vga_controller bus_master cap_list rom
        configuration: driver=i915 latency=0
        resources: irq:30 memory:f0000000-f03fffff memory:e0000000-efffffff ioport:5000(size=64)
-    • driver=i915 : Driver Intel standard 
-    • memory : Mémoire vidéo partagée avec la RAM système 
-6.3 Résolution et configuration
-bash
+```
+
+- **driver=i915** : Driver Intel standard
+- **memory** : Mémoire vidéo partagée avec la RAM système
+
+### 6.3 Résolution et configuration
+
+```bash
 xrandr
-Sortie :
+```
+
+**Sortie** :
+```
 Screen 0: minimum 8 x 8, current 1366 x 768, maximum 16384 x 16384
 LVDS1 connected primary 1366x768+0+0 (normal left inverted right x axis y axis) 309mm x 174mm
    1366x768      60.00*+
@@ -1163,58 +1465,95 @@ LVDS1 connected primary 1366x768+0+0 (normal left inverted right x axis y axis) 
    640x480       59.94  
 VGA1 disconnected (normal left inverted right x axis y axis)
 DP1 disconnected (normal left inverted right x axis y axis)
-Décryptage :
-    • Screen 0 : Écran virtuel (peut contenir plusieurs sorties) 
-    • LVDS1 : Écran interne du laptop 
-        ◦ LVDS : Low-Voltage Differential Signaling (interface LCD) 
-        ◦ connected primary : Écran principal actif 
-        ◦ 1366x768+0+0 : Résolution et position (x+y) 
-        ◦ 309mm x 174mm : Taille physique (calculée via EDID) 
-    • 1366x768 60.00+* : 
-        ◦ Résolution disponible 
-        ◦ 60.00 : Taux de rafraîchissement (Hz) 
-        ◦ ***** : Résolution actuelle 
-        ◦ + : Résolution préférée (native) 
-    • VGA1, DP1 : Sorties vidéo externes (non connectées) 
-Changer la résolution :
-bash
+```
+
+**Décryptage** :
+- **Screen 0** : Écran virtuel (peut contenir plusieurs sorties)
+- **LVDS1** : Écran interne du laptop
+  - LVDS : Low-Voltage Differential Signaling (interface LCD)
+  - connected primary : Écran principal actif
+  - 1366x768+0+0 : Résolution et position (x+y)
+  - 309mm x 174mm : Taille physique (calculée via EDID)
+- **1366x768 60.00\*+** :
+  - Résolution disponible
+  - 60.00 : Taux de rafraîchissement (Hz)
+  - **\*** : Résolution actuelle
+  - **+** : Résolution préférée (native)
+- **VGA1, DP1** : Sorties vidéo externes (non connectées)
+
+**Changer la résolution** :
+
+```bash
 xrandr --output LVDS1 --mode 1024x768
-Multi-écran :
-bash
+```
+
+**Multi-écran** :
+
+```bash
 # Écran externe à droite de l'interne
 xrandr --output VGA1 --auto --right-of LVDS1
-6.4 Luminosité
-Chemin système
-bash
+```
+
+### 6.4 Luminosité
+
+#### Chemin système
+
+```bash
 ls /sys/class/backlight/
-Sortie :
+```
+
+**Sortie** :
+```
 intel_backlight
-Lire la luminosité :
-bash
+```
+
+**Lire la luminosité** :
+
+```bash
 cat /sys/class/backlight/intel_backlight/brightness
 cat /sys/class/backlight/intel_backlight/max_brightness
-Exemple :
+```
+
+**Exemple** :
+```
 5000    (actuelle)
 7812    (maximum)
-Calcul du pourcentage : 5000 / 7812 = 64%
-Modifier la luminosité :
-bash
+```
+
+**Calcul du pourcentage** : 5000 / 7812 = 64%
+
+**Modifier la luminosité** :
+
+```bash
 # 50% de 7812 = 3906
 echo 3906 | sudo tee /sys/class/backlight/intel_backlight/brightness
-Astuce : Créer un alias dans ~/.bashrc :
-bash
+```
+
+**Astuce : Créer un alias dans ~/.bashrc** :
+
+```bash
 alias bright='echo $((7812 * $1 / 100)) | sudo tee /sys/class/backlight/intel_backlight/brightness'
-Utilisation : bright 75 (met à 75%)
-Touches de fonction
+```
+
+**Utilisation** : `bright 75` (met à 75%)
+
+#### Touches de fonction
+
 Les touches Fn+F8/F9 ajustent la luminosité :
-    • Gérées par le daemon acpid 
-    • Configuration dans /etc/acpi/events/ 
-6.5 EDID (Extended Display Identification Data)
+- Gérées par le daemon acpid
+- Configuration dans `/etc/acpi/events/`
+
+### 6.5 EDID (Extended Display Identification Data)
+
 L'EDID contient les caractéristiques de votre écran :
-bash
+
+```bash
 sudo dnf install read-edid
 sudo get-edid | parse-edid
-Sortie :
+```
+
+**Sortie** :
+```
 EDID version: 1.3
 Manufacturer: LEN (Lenovo)
 Model: 40b0
@@ -1226,192 +1565,272 @@ Gamma: 2.20
 Supported features: DPMS, active off, RGB color
 Preferred mode: 1366x768 @ 60Hz
 Native resolution: 1366x768
-Informations importantes :
-    • Manufacturer : Fabricant de la dalle 
-    • Made in : Date de fabrication 
-    • Gamma: 2.20 : Courbe de correction colorimétrique 
-    • Native resolution : Résolution physique de la dalle 
-6.6 Remplacement de l'écran
-Modèles compatibles T420 :
-    • 1366×768 : Standard (dalle TN, angles de vue limités) 
-    • 1600×900 : Premium (dalle IPS possible, meilleurs angles) 
-Upgrade possible :
-    • Passer de 1366×768 à 1600×900 
-    • Nécessite dalle compatible + inverter (si CCFL) ou pas (si LED) 
-Procédure :
-    1. Retirez la batterie 
-    2. Dévissez les caches des charnières (avant du laptop) 
-    3. Retirez les caches caoutchouc devant l'écran (6 points) 
-    4. Dévissez les 6 vis cachées 
-    5. Séparez le cadre de l'écran (clips plastiques) 
-    6. Dévissez les supports métalliques de la dalle (4 vis) 
-    7. Basculez la dalle, débranchez le câble LVDS 
-    8. Installation inverse avec nouvelle dalle 
-ATTENTION :
-    • Dalle fragile (ne pas appuyer sur la surface) 
-    • Câble LVDS délicat (pas de pliure) 
-    • Vérifiez la compatibilité (connecteur 40 pins) 
 ```
+
+**Informations importantes** :
+- **Manufacturer** : Fabricant de la dalle
+- **Made in** : Date de fabrication
+- **Gamma: 2.20** : Courbe de correction colorimérique
+- **Native resolution** : Résolution physique de la dalle
+
+### 6.6 Remplacement de l'écran
+
+**Modèles compatibles T420** :
+- **1366×768** : Standard (dalle TN, angles de vue limités)
+- **1600×900** : Premium (dalle IPS possible, meilleurs angles)
+
+**Upgrade possible** :
+- Passer de 1366×768 à 1600×900
+- Nécessite dalle compatible + inverter (si CCFL) ou pas (si LED)
+
+**Procédure** :
+1. Retirez la batterie
+2. Dévissez les caches des charnières (avant du laptop)
+3. Retirez les caches caoutchouc devant l'écran (6 points)
+4. Dévissez les 6 vis cachées
+5. Séparez le cadre de l'écran (clips plastiques)
+6. Dévissez les supports métalliques de la dalle (4 vis)
+7. Basculez la dalle, débranchez le câble LVDS
+8. Installation inverse avec nouvelle dalle
+
+**ATTENTION** :
+- Dalle fragile (ne pas appuyer sur la surface)
+- Câble LVDS délicat (pas de pliure)
+- Vérifiez la compatibilité (connecteur 40 pins)
+
 ---
+
 ## 7. Clavier
-```text
-7.1 Architecture du clavier
+
+### 7.1 Architecture du clavier
+
 Le clavier est un périphérique d'entrée HID (Human Interface Device) :
-    • Connecté en interne via PS/2 (émulé sur USB) 
-    • Gère les touches ET le TrackPoint 
-7.2 Identification
-bash
+- Connecté en interne via PS/2 (émulé sur USB)
+- Gère les touches ET le TrackPoint
+
+### 7.2 Identification
+
+```bash
 cat /proc/bus/input/devices | grep -A 5 keyboard
-Sortie :
+```
+
+**Sortie** :
+```
 N: Name="AT Translated Set 2 keyboard"
 P: Phys=isa0060/serio0/input0
 S: Sysfs=/devices/platform/i8042/serio0/input/input3
 U: Uniq=
 H: Handlers=sysrq kbd event3 
 B: PROP=0
-Explication :
-    • Name: AT Translated Set 2 : 
-        ◦ Standard PC clavier 
-        ◦ "AT" = IBM PC/AT (ancien standard toujours utilisé) 
-    • Phys: isa0060/serio0 : 
-        ◦ Port PS/2 (adresse I/O 0x60) 
-        ◦ serio0 : premier port série (clavier) 
-        ◦ serio1 : second port (TrackPoint/touchpad) 
-    • Handlers: sysrq kbd event3 : 
-        ◦ sysrq : Magic SysRq (touches d'urgence kernel) 
-        ◦ kbd : Interface clavier standard 
-        ◦ event3 : Fichier événement (/dev/input/event3) 
-7.3 Test des touches
-evtest (outil interactif)
-bash
+```
+
+**Explication** :
+- **Name: AT Translated Set 2** :
+  - Standard PC clavier
+  - "AT" = IBM PC/AT (ancien standard toujours utilisé)
+- **Phys: isa0060/serio0** :
+  - Port PS/2 (adresse I/O 0x60)
+  - serio0 : premier port série (clavier)
+  - serio1 : second port (TrackPoint/touchpad)
+- **Handlers: sysrq kbd event3** :
+  - sysrq : Magic SysRq (touches d'urgence kernel)
+  - kbd : Interface clavier standard
+  - event3 : Fichier événement (/dev/input/event3)
+
+### 7.3 Test des touches
+
+#### evtest (outil interactif)
+
+```bash
 sudo dnf install evtest
 sudo evtest
-Déroulement :
-    1. Liste les périphériques disponibles 
-    2. Choisissez le clavier (ex: /dev/input/event3) 
-    3. Tapez des touches, voyez les événements 
-Sortie exemple :
+```
+
+**Déroulement** :
+1. Liste les périphériques disponibles
+2. Choisissez le clavier (ex: /dev/input/event3)
+3. Tapez des touches, voyez les événements
+
+**Sortie exemple** :
+```
 Event: time 1234567890.123456, type 4 (EV_MSC), code 4 (MSC_SCAN), value 1c
 Event: time 1234567890.123456, type 1 (EV_KEY), code 28 (KEY_ENTER), value 1
 Event: time 1234567890.123456, -------------- SYN_REPORT ------------
-Décryptage :
-    • type 1 (EV_KEY) : Événement touche 
-    • code 28 (KEY_ENTER) : Touche Entrée 
-    • value 1 : Appuyée (0 = relâchée, 2 = maintenue) 
-Utilité :
-    • Tester des touches douteuses 
-    • Vérifier les touches multimédia 
-    • Diagnostiquer un clavier défectueux 
-xev (environnement graphique)
-bash
+```
+
+**Décryptage** :
+- **type 1 (EV_KEY)** : Événement touche
+- **code 28 (KEY_ENTER)** : Touche Entrée
+- **value 1** : Appuyée (0 = relâchée, 2 = maintenue)
+
+**Utilité** :
+- Tester des touches douteuses
+- Vérifier les touches multimédia
+- Diagnostiquer un clavier défectueux
+
+#### xev (environnement graphique)
+
+```bash
 xev
-    • Ouvre une fenêtre 
-    • Tapez dedans, voyez les événements X11 
-    • Plus d'infos : keycodes X, modificateurs (Shift, Ctrl) 
-7.4 Disposition du clavier
-bash
+```
+
+- Ouvre une fenêtre
+- Tapez dedans, voyez les événements X11
+- Plus d'infos : keycodes X, modificateurs (Shift, Ctrl)
+
+### 7.4 Disposition du clavier
+
+```bash
 # Voir la disposition actuelle
 localectl status
-Sortie :
+```
+
+**Sortie** :
+```
    System Locale: LANG=fr_FR.UTF-8
        VC Keymap: fr
       X11 Layout: fr
      X11 Variant: oss
-    • VC Keymap: fr : Console virtuelle (TTY) en français 
-    • X11 Layout: fr : Environnement graphique en français 
-    • X11 Variant: oss : Variante (oss = avec touches mortes) 
-Changer la disposition :
-bash
+```
+
+- **VC Keymap: fr** : Console virtuelle (TTY) en français
+- **X11 Layout: fr** : Environnement graphique en français
+- **X11 Variant: oss** : Variante (oss = avec touches mortes)
+
+**Changer la disposition** :
+
+```bash
 sudo localectl set-keymap fr
 sudo localectl set-x11-keymap fr
-7.5 Rétro-éclairage du clavier
-Le T420 n'a PAS de rétro-éclairage clavier de série.
-Option : Clavier de T420s (version slim) compatible mais rare.
-7.6 Remplacement du clavier
-Procédure T420 :
-    1. Éteignez et retirez la batterie 
-    2. Poussez les 2 languettes au-dessus du clavier vers l'écran 
-    3. Basculez le clavier vers vous (charnière en bas) 
-    4. Débranchez le câble ruban (soulevez le loquet marron) 
-    5. Installez le nouveau clavier (insérez le câble, verrouillez) 
-    6. Replacez le clavier (clips en haut, languettes en bas) 
-Compatibilité :
-    • Cherchez "FRU 45N2211" (clavier FR) 
-    • Ou équivalent US/UK selon votre besoin 
-    • Compatible T420, T420i, T420s (vérifiez nappes) 
-
 ```
+
+### 7.5 Rétro-éclairage du clavier
+
+Le T420 n'a PAS de rétro-éclairage clavier de série.
+
+**Option** : Clavier de T420s (version slim) compatible mais rare.
+
+### 7.6 Remplacement du clavier
+
+**Procédure T420** :
+1. Éteignez et retirez la batterie
+2. Poussez les 2 languettes au-dessus du clavier vers l'écran
+3. Basculez le clavier vers vous (charnière en bas)
+4. Débranchez le câble ruban (soulevez le loquet marron)
+5. Installez le nouveau clavier (insérez le câble, verrouillez)
+6. Replacez le clavier (clips en haut, languettes en bas)
+
+**Compatibilité** :
+- Cherchez "FRU 45N2211" (clavier FR)
+- Ou équivalent US/UK selon votre besoin
+- Compatible T420, T420i, T420s (vérifiez nappes)
+
 ---
+
 ## 8. USB et périphériques
-```text
-8.1 Architecture USB
-Versions USB :
-    • USB 1.1 : 12 Mbit/s (obsolète) 
-    • USB 2.0 : 480 Mbit/s (60 MB/s) 
-    • USB 3.0 : 5 Gbit/s (625 MB/s) - connecteur bleu 
-    • USB 3.1/3.2 : 10-20 Gbit/s (absent sur T420) 
-T420 dispose :
-    • 2× USB 2.0 (côté gauche) 
-    • 1× USB 2.0 + eSATA combo (côté gauche) 
-    • 1× USB 3.0 (côté droit, ExpressCard avec adaptateur optionnel) 
-8.2 Lister les périphériques USB
-bash
+
+### 8.1 Architecture USB
+
+**Versions USB** :
+- **USB 1.1** : 12 Mbit/s (obsolète)
+- **USB 2.0** : 480 Mbit/s (60 MB/s)
+- **USB 3.0** : 5 Gbit/s (625 MB/s) - connecteur bleu
+- **USB 3.1/3.2** : 10-20 Gbit/s (absent sur T420)
+
+**T420 dispose** :
+- 2× USB 2.0 (côté gauche)
+- 1× USB 2.0 + eSATA combo (côté gauche)
+- 1× USB 3.0 (côté droit, ExpressCard avec adaptateur optionnel)
+
+### 8.2 Lister les périphériques USB
+
+```bash
 lsusb
-Sortie :
+```
+
+**Sortie** :
+```
 Bus 001 Device 002: ID 8087:0024 Intel Corp. Integrated Rate Matching Hub
 Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
 Bus 002 Device 003: ID 04f2:b217 Chicony Electronics Co., Ltd Lenovo Integrated Camera
 Bus 002 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
 Bus 003 Device 002: ID 0a5c:217f Broadcom Corp. BCM2045B (BDC-2.1)
 Bus 003 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-Format : Bus XXX Device YYY: ID VVVV:PPPP Manufacturer Product
-    • Bus 001 : Contrôleur USB #1 
-    • Device 002 : Périphérique #2 sur ce bus 
-    • ID 8087:0024 : 
-        ◦ 8087 : Vendor ID (Intel) 
-        ◦ 0024 : Product ID (Hub USB) 
-Périphériques internes :
-    • Integrated Rate Matching Hub : Hub interne (multiplie les ports) 
-    • Lenovo Integrated Camera : Webcam 
-    • Broadcom BCM2045B : Bluetooth 
-    • root hub : Contrôleur USB racine 
-Version détaillée :
-bash
+```
+
+**Format** : `Bus XXX Device YYY: ID VVVV:PPPP Manufacturer Product`
+
+- **Bus 001** : Contrôleur USB #1
+- **Device 002** : Périphérique #2 sur ce bus
+- **ID 8087:0024** :
+  - 8087 : Vendor ID (Intel)
+  - 0024 : Product ID (Hub USB)
+
+**Périphériques internes** :
+- **Integrated Rate Matching Hub** : Hub interne (multiplie les ports)
+- **Lenovo Integrated Camera** : Webcam
+- **Broadcom BCM2045B** : Bluetooth
+- **root hub** : Contrôleur USB racine
+
+**Version détaillée** :
+
+```bash
 lsusb -v
+```
+
 ⚠️ Très verbeux (plusieurs pages par périphérique)
-Filtrer :
-bash
+
+**Filtrer** :
+
+```bash
 lsusb -v -d 04f2:b217  # Détails de la webcam
-8.3 Arborescence USB
-bash
+```
+
+### 8.3 Arborescence USB
+
+```bash
 lsusb -t
-Sortie :
+```
+
+**Sortie** :
+```
 /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=ehci-pci/3p, 480M
     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/6p, 480M
         |__ Port 4: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
         |__ Port 4: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
 /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=uhci_hcd/2p, 12M
     |__ Port 2: Dev 2, If 0, Class=Wireless, Driver=btusb, 12M
-Explication :
-    • Bus 01 : Contrôleur USB 2.0 (480M) 
-        ◦ Dev 2 : Hub interne (6 ports) 
-            ▪ Dev 3 : Webcam (2 interfaces : vidéo + contrôle) 
-    • Bus 02 : Contrôleur USB 1.1 (12M) 
-        ◦ Dev 2 : Bluetooth 
-    • Driver : Module kernel utilisé 
-        ◦ uvcvideo : USB Video Class (standard webcam) 
-        ◦ btusb : Bluetooth USB 
-        ◦ hub : Gestion de hub 
-8.4 Surveillance en temps réel
-bash
+```
+
+**Explication** :
+- **Bus 01** : Contrôleur USB 2.0 (480M)
+  - Dev 2 : Hub interne (6 ports)
+    - Dev 3 : Webcam (2 interfaces : vidéo + contrôle)
+- **Bus 02** : Contrôleur USB 1.1 (12M)
+  - Dev 2 : Bluetooth
+- **Driver** : Module kernel utilisé
+  - uvcvideo : USB Video Class (standard webcam)
+  - btusb : Bluetooth USB
+  - hub : Gestion de hub
+
+### 8.4 Surveillance en temps réel
+
+```bash
 watch -n 0.5 lsusb
-    • Rafraîchit toutes les 0.5s 
-    • Branchez/débranchez un périphérique 
-    • Voyez l'apparition/disparition 
-Logs kernel :
-bash
+```
+
+- Rafraîchit toutes les 0.5s
+- Branchez/débranchez un périphérique
+- Voyez l'apparition/disparition
+
+**Logs kernel** :
+
+```bash
 sudo dmesg -w
-Puis branchez une clé USB :
+```
+
+**Puis branchez une clé USB** :
+```
 [12345.678901] usb 1-1.4: new high-speed USB device number 5 using ehci-pci
 [12345.789012] usb 1-1.4: New USB device found, idVendor=0781, idProduct=5583
 [12345.789023] usb 1-1.4: New USB device strings: Mfr=1, Product=2, SerialNumber=3
@@ -1426,19 +1845,24 @@ Puis branchez une clé USB :
 [12347.456789] sd 6:0:0:0: [sdb] Write cache: disabled
 [12347.567890]  sdb: sdb1
 [12347.678901] sd 6:0:0:0: [sdb] Attached SCSI removable disk
-Analyse :
-    1. new high-speed USB device : Détecté en USB 2.0 
-    2. idVendor=0781, idProduct=5583 : Identifiants 
-    3. Product: Ultra Fit : Nom du produit 
-    4. USB Mass Storage : Type de périphérique 
-    5. scsi host6 : Assigné au sous-système SCSI 
-    6. sd 6:0:0:0: [sdb] : Apparaît comme /dev/sdb 
-    7. 30310400 512-byte blocks : Capacité (15.5 GB) 
-    8. sdb: sdb1 : Une partition détectée 
-    9. Attached SCSI removable disk : Prêt à l'utilisation 
-8.5 Vitesse de transfert USB
-Test avec dd
-bash
+```
+
+**Analyse** :
+1. **new high-speed USB device** : Détecté en USB 2.0
+2. **idVendor=0781, idProduct=5583** : Identifiants
+3. **Product: Ultra Fit** : Nom du produit
+4. **USB Mass Storage** : Type de périphérique
+5. **scsi host6** : Assigné au sous-système SCSI
+6. **sd 6:0:0:0: [sdb]** : Apparaît comme /dev/sdb
+7. **30310400 512-byte blocks** : Capacité (15.5 GB)
+8. **sdb: sdb1** : Une partition détectée
+9. **Attached SCSI removable disk** : Prêt à l'utilisation
+
+### 8.5 Vitesse de transfert USB
+
+#### Test avec dd
+
+```bash
 # ATTENTION : Remplacez /dev/sdX par votre périphérique USB !
 # Ceci EFFACERA toutes les données !
 
@@ -1452,16 +1876,22 @@ sudo dd if=/dev/zero of=/dev/sdX bs=1M count=1024 oflag=direct
 # 1024+0 records in
 # 1024+0 records out
 # 1073741824 bytes (1.1 GB) copied, 18.3456 s, 58.5 MB/s
-Vitesses attendues :
-    • USB 2.0 : 30-40 MB/s (pratique vs 60 MB/s théorique) 
-    • USB 3.0 : 100-400 MB/s (selon qualité de la clé) 
-Si vitesse très basse (<10 MB/s sur USB 2.0) :
-    • Clé USB de mauvaise qualité 
-    • Problème de driver 
-    • Port USB endommagé 
-8.6 Problèmes courants
-Périphérique non reconnu
-bash
+```
+
+**Vitesses attendues** :
+- **USB 2.0** : 30-40 MB/s (pratique vs 60 MB/s théorique)
+- **USB 3.0** : 100-400 MB/s (selon qualité de la clé)
+
+**Si vitesse très basse (<10 MB/s sur USB 2.0)** :
+- Clé USB de mauvaise qualité
+- Problème de driver
+- Port USB endommagé
+
+### 8.6 Problèmes courants
+
+#### Périphérique non reconnu
+
+```bash
 # Vérifier si détecté physiquement
 lsusb
 
@@ -1471,19 +1901,31 @@ sudo dmesg | tail -20
 # Forcer la réinitialisation du port USB
 echo "1-1.4" | sudo tee /sys/bus/usb/drivers/usb/unbind
 echo "1-1.4" | sudo tee /sys/bus/usb/drivers/usb/bind
-Consommation électrique excessive
+```
+
+#### Consommation électrique excessive
+
 Certains périphériques consomment trop :
-bash
+
+```bash
 # Voir la consommation par port
 cat /sys/bus/usb/devices/*/power/level
-Solution : Hub USB alimenté externement
 ```
+
+**Solution** : Hub USB alimenté externement
+
 ---
-9. Architecture complète du système
-9.1 Vue d'ensemble matérielle
-bash
+
+## 9. Architecture complète du système
+
+### 9.1 Vue d'ensemble matérielle
+
+```bash
 sudo lshw -short
-Sortie (simplifiée) :
+```
+
+**Sortie (simplifiée)** :
+```
 H/W path          Device      Class          Description
 ======================================================
                               system         20AT004FGE (LENOVO_MT_20AT)
@@ -1512,35 +1954,48 @@ H/W path          Device      Class          Description
 /0/1/0.0.0/1     /dev/sda1   volume         511MiB EXT4 volume
 /0/1/0.0.0/2     /dev/sda2   volume         97GiB EXT4 volume
 /0/1/0.0.0/3     /dev/sda3   volume         7812MiB Linux swap volume
-Hiérarchie :
-    • /0 : Carte mère (bus principal) 
-        ◦ /0/0 : BIOS 
-        ◦ /0/4 : CPU + caches 
-        ◦ /0/d : RAM (2 slots) 
-        ◦ /0/100 : Northbridge (contrôleur mémoire/PCI) 
-            ▪ /0/100/2 : GPU 
-            ▪ /0/100/19 : Ethernet 
-            ▪ /0/100/1a : Contrôleur USB 
-            ▪ /0/100/1c/0 : WiFi (sur bus PCIe) 
-            ▪ /0/100/1f : Southbridge (périphériques lents) 
-                • /0/100/1f.2 : Contrôleur SATA 
-        ◦ /0/1 : Stockage SCSI (disque) 
-9.2 DMI / SMBIOS
-bash
+```
+
+**Hiérarchie** :
+- **/0** : Carte mère (bus principal)
+  - /0/0 : BIOS
+  - /0/4 : CPU + caches
+  - /0/d : RAM (2 slots)
+  - /0/100 : Northbridge (contrôleur mémoire/PCI)
+    - /0/100/2 : GPU
+    - /0/100/19 : Ethernet
+    - /0/100/1a : Contrôleur USB
+    - /0/100/1c/0 : WiFi (sur bus PCIe)
+    - /0/100/1f : Southbridge (périphériques lents)
+      - /0/100/1f.2 : Contrôleur SATA
+  - /0/1 : Stockage SCSI (disque)
+
+### 9.2 DMI / SMBIOS
+
+```bash
 sudo dmidecode
-Informations BIOS :
+```
+
+**Informations BIOS** :
+```
 BIOS Information
         Vendor: LENOVO
         Version: GJET97WW (2.47 )
         Release Date: 09/13/2018
         ROM Size: 8192 kB
-Carte mère :
+```
+
+**Carte mère** :
+```
 Base Board Information
         Manufacturer: LENOVO
         Product Name: 20AT004FGE
         Version: Not Defined
         Serial Number: 1ZXXXX123456
-Processeur :
+```
+
+**Processeur** :
+```
 Processor Information
         Socket Designation: CPU Socket - U3E1
         Type: Central Processor
@@ -1556,10 +2011,16 @@ Processor Information
         L1 Cache Handle: 0x0005
         L2 Cache Handle: 0x0006
         L3 Cache Handle: 0x0007
-9.3 Modules kernel chargés
-bash
+```
+
+### 9.3 Modules kernel chargés
+
+```bash
 lsmod | head -20
-Sortie :
+```
+
+**Sortie** :
+```
 Module                  Size  Used by
 snd_hda_codec_hdmi     53248  1
 snd_hda_codec_realtek 110592  1
@@ -1571,16 +2032,23 @@ uvcvideo               94208  0
 videobuf2_vmalloc      16384  1 uvcvideo
 i915                 2232320  3
 drm_kms_helper        184320  1 i915
-Modules importants :
-    • iwlwifi / iwlmvm : WiFi Intel 
-    • e1000e : Ethernet Intel 
-    • i915 : GPU Intel 
-    • uvcvideo : Webcam USB 
-    • snd_hda_* : Audio 
-Informations sur un module :
-bash
+```
+
+**Modules importants** :
+- **iwlwifi / iwlmvm** : WiFi Intel
+- **e1000e** : Ethernet Intel
+- **i915** : GPU Intel
+- **uvcvideo** : Webcam USB
+- **snd_hda_\*** : Audio
+
+**Informations sur un module** :
+
+```bash
 modinfo i915
-Sortie :
+```
+
+**Sortie** :
+```
 filename:       /lib/modules/5.14.0/kernel/drivers/gpu/drm/i915/i915.ko.xz
 license:        GPL and additional rights
 description:    Intel Graphics
@@ -1588,21 +2056,31 @@ author:         Intel Corporation
 firmware:       i915/tgl_dmc_ver2_12.bin
 ...
 parm:           modeset:Use kernel modesetting [KMS] (0=disable, 1=on, -1=force vga console preference) (int)
-    • filename : Chemin du module 
-    • description : Rôle 
-    • firmware : Fichiers firmware nécessaires 
-    • parm : Paramètres configurables 
-Charger/décharger un module :
-bash
+```
+
+- **filename** : Chemin du module
+- **description** : Rôle
+- **firmware** : Fichiers firmware nécessaires
+- **parm** : Paramètres configurables
+
+**Charger/décharger un module** :
+
+```bash
 # Charger
 sudo modprobe <nom_module>
 
 # Décharger (si non utilisé)
 sudo modprobe -r <nom_module>
-9.4 Interruptions (IRQ)
-bash
+```
+
+### 9.4 Interruptions (IRQ)
+
+```bash
 cat /proc/interrupts
-Sortie (extraits) :
+```
+
+**Sortie (extraits)** :
+```
            CPU0       CPU1       CPU2       CPU3       
   0:         42          0          0          0   IO-APIC   2-edge      timer
   1:       9876       1234       5678       2345   IO-APIC   1-edge      i8042
@@ -1611,24 +2089,30 @@ Sortie (extraits) :
  16:      12345      23456      34567      45678   IO-APIC  16-fasteoi   i915
  17:     123456     234567     345678     456789   IO-APIC  17-fasteoi   snd_hda_intel
  19:      98765      87654      76543      65432   IO-APIC  19-fasteoi   enp0s25
-IRQ (Interrupt Request) :
-    • Ligne de communication entre périphérique et CPU 
-    • Le périphérique "interrompt" le CPU pour signaler un événement 
-Colonnes :
-    • 0-3 : Nombre d'interruptions par CPU 
-    • IO-APIC : Contrôleur d'interruptions (moderne) 
-    • edge / fasteoi : Type de déclenchement 
-    • Nom : Périphérique concerné 
-Périphériques :
-    • timer : Horloge système (nombreuses interruptions) 
-    • i8042 : Contrôleur clavier/souris 
-    • i915 : GPU (beaucoup d'interruptions si affichage actif) 
-    • enp0s25 : Ethernet (interruptions lors de paquets reçus) 
+```
+
+**IRQ (Interrupt Request)** :
+- Ligne de communication entre périphérique et CPU
+- Le périphérique "interrompt" le CPU pour signaler un événement
+
+**Colonnes** :
+- **0-3** : Nombre d'interruptions par CPU
+- **IO-APIC** : Contrôleur d'interruptions (moderne)
+- **edge / fasteoi** : Type de déclenchement
+- **Nom** : Périphérique concerné
+
+**Périphériques** :
+- **timer** : Horloge système (nombreuses interruptions)
+- **i8042** : Contrôleur clavier/souris
+- **i915** : GPU (beaucoup d'interruptions si affichage actif)
+- **enp0s25** : Ethernet (interruptions lors de paquets reçus)
+
 **Problème : IRQ partagées** :
+
 Anciens systèmes partageaient les IRQ entre plusieurs périphériques, causant des conflits. Systèmes modernes (MSI) évitent ce problème.
 
 **Si trop d'interruptions sur un périphérique** :
-- Driver bugué
+- Driver bogué
 - Périphérique défectueux
 - Boucle d'interruptions (exemple : câble réseau défectueux)
 
@@ -1707,7 +2191,6 @@ cat /proc/dma
 **cascade** : Canal DMA 4 utilisé pour chaîner les contrôleurs DMA
 
 Sur systèmes modernes, DMA évolué vers **Bus Mastering** (périphériques PCI contrôlent entièrement leurs transferts).
-
 ---
 
 ## 10. Méthodologie de diagnostic
