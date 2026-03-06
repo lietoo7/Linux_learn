@@ -13,7 +13,7 @@
 8. [Package Management]( )
 9. [Débogage_matériel](09_débogage_matériel.md)
 10. [La commande SCP](10_scp.md)
-11. [Débogage_matériel](11_tar.md)
+11. [La commande tar](11_tar.md)
 
 
 ---
