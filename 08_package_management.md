@@ -148,3 +148,50 @@ Vérifie que le paquet a été signé par une clé de confiance de l'éditeur.
    dpkg-sig --verify <nom_du_paquet>.deb
 
  * Arch Linux : pacman gère cela nativement via la configuration SigLevel dans /etc/pacman.conf
+---
+## 8. Afficher Les paquets et dépendances 
+### 8.1 Lister les paquets
+| Distribution | Commande pour tout lister | Filtrer un paquet spécifique | Lister les paquets manuels |
+|---|---|---|---|
+| Debian / Ubuntu | dpkg -l | dpkg -l | grep <nom> | (Via apt) apt list --installed |
+| RHEL / AlmaLinux | rpm -qa | rpm -qa | grep <nom> | dnf list installed |
+| Arch Linux | pacman -Q | pacman -Q | grep <nom> | pacman -Qe |
+Rappels utiles
+ * Le Pipe (|) : Ton utilisation de grep est universelle. C'est la méthode la plus rapide pour ne pas polluer ton écran avec des milliers de lignes.
+ * Précision Arch Linux : La commande pacman -Qe est particulièrement propre pour nettoyer un système, car elle ne montre que ce que tu as décidé d'installer, pas les centaines de bibliothèques (dépendances) qui viennent avec.
+
+### 8.2 Afficher les dépendances d’un paquet
+| Famille / Distro | Paquet déjà installé | Paquet avant installation | Note spécifique |
+|---|---|---|---|
+| Debian / Ubuntu | dpkg -s <nom> | apt-cache depends <nom> | dpkg est local uniquement. |
+| RHEL / AlmaLinux | rpm -qR <nom> | dnf deplist <nom> | dnf interroge les dépôts. |
+| Arch Linux | pacman -Qi <nom> | pacman -Si <nom> | -Q (Query) vs -S (Sync). |
+
+Points clés à retenir
+ * Arch Linux : La logique est très visuelle. Le suffixe -i (info) s'ajoute soit à -Q pour le local, soit à -S pour le distant.
+ * Debian/Ubuntu : dpkg -s (status) donne beaucoup d'infos, dont les dépendances, mais seulement si le paquet est présent sur ton disque.
+ * RHEL : dnf deplist est extrêmement détaillé, il liste même les capacités (capabilities) requises par le paquet.
+
+---
+## 9. Suppression de paquets sous Linux
+1. Famille Debian / Ubuntu
+| Outil | Commande | Particularité |
+|---|---|---|
+| APT | sudo apt remove <nom> | Supprime le logiciel uniquement. |
+| APT (Complet) | sudo apt purge <nom> | Supprime aussi les fichiers de configuration. |
+| dpkg | sudo dpkg -r <nom> | Pour les paquets .deb installés localement. |
+2. Famille RHEL / AlmaLinux / Fedora
+| Outil | Commande | Particularité |
+|---|---|---|
+| DNF | sudo dnf remove <nom> | Gère proprement les dépendances. |
+| RPM | sudo rpm -e <nom> | Plus "brut", peut bloquer si des dépendances existent. |
+3. Arch Linux
+| Outil | Commande | Particularité |
+|---|---|---|
+| Pacman | sudo pacman -R <nom> | Suppression simple. |
+| Pacman + Déps | sudo pacman -Rs <nom> | Supprime aussi les dépendances inutilisées. |
+4. Formats Universels (Snap)
+| Outil | Commande | Particularité |
+|---|---|---|
+| Snap | sudo snap remove <nom> | Par défaut, crée un snapshot (sauvegarde) des données. |
+| Snap (Purge) | sudo snap remove <nom> --purge | Supprime tout, sans garder de snapshot. |
