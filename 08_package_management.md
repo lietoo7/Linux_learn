@@ -63,10 +63,72 @@ Pour pallier les différences entre distributions, des formats "universels" exis
 * **Flatpak** (très populaire sur desktop) : `flatpak install flathub org.videolan.VLC`
 
 ---
+## 6. Installation Hors-Ligne (Offline)
+Utile pour les environnements isolés (air-gap) via un support externe (clé USB, disque).
+C'est une excellente idée. Sans cette étape, la section "Hors-ligne" est incomplète car l'utilisateur se retrouvera bloqué par une cascade de dépendances manquantes une fois devant sa machine isolée.
+Voici la section complémentaire à insérer juste avant l'étape d'installation (ou au début de la section 6) pour rendre la fiche vraiment opérationnelle.
+### 6.1. Préparation : Récupérer le paquet ET ses dépendances
+Sur la machine connectée à Internet, avant le transfert sur clé USB.
 
-## Résumé pratique
+Avec RHEL / AlmaLinux / CentOS (DNF)
 
-> **La règle d'or :**
-> N'installez jamais un logiciel avec `sudo` si vous ne savez pas d'où il vient. Privilégiez toujours les dépôts officiels de votre distribution via `apt`, `dnf` ou `pacman`.
+La commande download avec l'option --resolve est la méthode la plus fiable pour ne rien oublier.
+#### Créez un dossier propre pour le transfert
+mkdir ~/transfert_usb && cd ~/transfert_usb
 
- 
+#### Télécharge le paquet et TOUTES ses dépendances non installées
+sudo dnf download --resolve --alldeps <nom_du_paquet> --destdir=.
+
+ * --resolve : Analyse l'arbre des dépendances.
+ * --alldeps : Force le téléchargement de toutes les dépendances (même si elles sont déjà sur le PC connecté).
+
+Avec Debian / Ubuntu (APT)
+
+APT ne possède pas d'option native aussi directe que DNF pour le téléchargement groupé, mais on utilise souvent apt-get :
+#### Télécharge les .deb dans le dossier courant
+sudo apt-get download $(apt-rdepends <nom_du_paquet> | grep -v "^ " | grep -v "debconf")
+
+Note : nécessite l'outil apt-rdepends (sudo apt install apt-rdepends).
+
+Avec Arch Linux (Pacman)
+
+Arch utilise son cache local ou des outils tiers, mais la méthode standard est :
+sudo pacman -Sw <nom_du_paquet> --cachedir .
+
+ * -Sw : Download only (ne pas installer).
+
+> [!IMPORTANT]
+> Compatibilité des versions : Pour que cette méthode fonctionne à 100 %, la machine connectée doit idéalement être sous le même OS (et la même version mineure) que la machine isolée. Si la machine connectée est sous Alma 9.4 et l'isolée sous Alma 9.1, il peut y avoir des conflits de versions de librairies critiques comme la glibc.
+> 
+
+### 6.2 Ensuite sur la Machine en offline
+Debian / Ubuntu (.deb)
+sudo dpkg -i <nom_du_paquet>.deb
+
+> Note : Si des dépendances manquent (erreur de configuration), utilisez sudo apt --fix-broken install une fois les dépendances copiées localement.
+> 
+RHEL / AlmaLinux / CentOS (.rpm)
+sudo dnf install --disablerepo=* --nogpgcheck *.rpm
+
+ * --disablerepo=* : Force DNF à ignorer les dépôts distants (évite les erreurs de timeout).
+ * --nogpgcheck : Ignore la signature GPG (nécessaire si les clés publiques n'ont pas été importées sur la machine isolée).
+Arch Linux (.pkg.tar.zst)
+sudo pacman -U /chemin/vers/paquet.pkg.tar.zst
+---
+## 7. Vérification des Signatures et Intégrité
+Procédure de sécurité pour s'assurer qu'un paquet n'a pas été corrompu ou altéré.
+Vérification par somme de contrôle (Hash)
+Comparez la valeur produite par cette commande avec celle fournie sur le site officiel :
+sha256sum <nom_du_fichier>
+
+Vérification par signature GPG
+Vérifie que le paquet a été signé par une clé de confiance de l'éditeur.
+ * RHEL / AlmaLinux :
+   rpm --checksig <nom_du_paquet>.rpm
+# Ou pour plus de détails :
+rpm -K <nom_du_paquet>.rpm
+
+ * Debian / Ubuntu :
+   dpkg-sig --verify <nom_du_paquet>.deb
+
+ * Arch Linux : pacman gère cela nativement via la configuration SigLevel dans /etc/pacman.conf
