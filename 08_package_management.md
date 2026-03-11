@@ -125,8 +125,6 @@ Vérification par signature GPG
 Vérifie que le paquet a été signé par une clé de confiance de l'éditeur.
  * RHEL / AlmaLinux :
    rpm --checksig <nom_du_paquet>.rpm
-# Ou pour plus de détails :
-rpm -K <nom_du_paquet>.rpm
 
  * Debian / Ubuntu :
    dpkg-sig --verify <nom_du_paquet>.deb
