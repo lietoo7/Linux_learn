@@ -156,6 +156,7 @@ Vérifie que le paquet a été signé par une clé de confiance de l'éditeur.
 | Debian / Ubuntu | dpkg -l | dpkg -l | grep <nom> | (Via apt) apt list --installed |
 | RHEL / AlmaLinux | rpm -qa | rpm -qa | grep <nom> | dnf list installed |
 | Arch Linux | pacman -Q | pacman -Q | grep <nom> | pacman -Qe |
+
 Rappels utiles
  * Le Pipe (|) : Ton utilisation de grep est universelle. C'est la méthode la plus rapide pour ne pas polluer ton écran avec des milliers de lignes.
  * Précision Arch Linux : La commande pacman -Qe est particulièrement propre pour nettoyer un système, car elle ne montre que ce que tu as décidé d'installer, pas les centaines de bibliothèques (dépendances) qui viennent avec.
