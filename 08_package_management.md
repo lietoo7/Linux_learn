@@ -114,6 +114,24 @@ sudo dnf install --disablerepo=* --nogpgcheck *.rpm
  * --nogpgcheck : Ignore la signature GPG (nécessaire si les clés publiques n'ont pas été importées sur la machine isolée).
 Arch Linux (.pkg.tar.zst)
 sudo pacman -U /chemin/vers/paquet.pkg.tar.zst
+
+### 6.3 La petite astuce avec Snap, Download & Install
+La procédure en 2 étapes
+ * Récupérer les fichiers (avec internet) :
+   * Commande : snap download [nom]
+   * Résultat : Vous obtenez deux fichiers : le logiciel (.snap) et sa signature de sécurité (.assert).
+ * Installer les fichiers (sans internet) :
+   * Étape A : sudo snap ack fichier.assert (Sert à valider l'authenticité du logiciel).
+   * Étape B : sudo snap install fichier.snap (Lance l'installation physique).
+
+Pourquoi faire cela ?
+ * Mode Hors-ligne : Installer des logiciels sur un PC sans connexion.
+ * Gain de temps : Télécharger une seule fois pour déployer sur plusieurs machines.
+ * Sécurité : Vérifier l'intégrité du paquet avant de l'injecter sur un système critique.
+
+> Point de vigilance : Pour qu'un Snap fonctionne sur un PC totalement vierge, assurez-vous d'avoir aussi téléchargé et installé le paquet de base (souvent core20 ou core22) via la même méthode.
+> 
+
 ---
 ## 7. Vérification des Signatures et Intégrité
 Procédure de sécurité pour s'assurer qu'un paquet n'a pas été corrompu ou altéré.
