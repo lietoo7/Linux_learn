@@ -1,4 +1,4 @@
-# 🐧 Memento Linux Shell
+# Memento Linux Shell
 
 ## 1. Gestion des fichiers et des répertoires
 
@@ -7,7 +7,7 @@
 | `ls -l` | Affiche le contenu avec détails (droits, propriétaire, taille, date). |
 | `ls -la` | Inclut les **fichiers cachés** dans l'affichage détaillé. |
 
-### 🔍 Utilisation de `find`
+### Recherche de fichier avec la commande `find`
 
 La commande `find` permet de rechercher des fichiers et répertoires selon divers critères :
 
@@ -37,7 +37,7 @@ La commande `find` permet de rechercher des fichiers et répertoires selon diver
 
 ---
 
-## 2. Recherche et traitement de texte
+## 2. Recherche de mot dans le texte
 
 ### `grep` (Global Regular Expression Print)
 
@@ -60,10 +60,8 @@ La commande `find` permet de rechercher des fichiers et répertoires selon diver
 
 * `whoami` : Affiche l'utilisateur actuel.
 * **Changement d'utilisateur :**
-* `su user` : Change d'utilisateur.
-* `su -l user` : Change d'utilisateur en chargeant son **environnement complet** (PATH, home, etc.).
-
-
+	* `su user` : Change d'utilisateur.
+	* `su -l user` : Change d'utilisateur en chargeant son **environnement complet** (PATH, home, etc.).
 * `getent passwd <user>` : Affiche les infos de l'utilisateur (depuis `/etc/passwd` ou LDAP).
 * `sudo userdel -r -f user1` : Supprime l'utilisateur `user1`, son home directory (`-r`) et force l'action (`-f`).
 
@@ -71,11 +69,12 @@ La commande `find` permet de rechercher des fichiers et répertoires selon diver
 
 ## 4. Processus et services
 
+### Information sur les Processus et services
 * `ps -aux` : Liste détaillée de tous les processus du système.
 * `dmesg --follow` : Affiche les messages du noyau en temps réel (logs matériel).
 * `systemctl start|stop|status|restart [service]` : Gère les services (ex: `systemctl status sshd`).
 
-### 🛑 Arrêt de processus
+### Arrêt de processus
 
 * `kill PID` : Arrête proprement un processus via son ID.
 * `kill -9 PID` : Force l'arrêt immédiat (Signal SIGKILL).
@@ -85,6 +84,7 @@ La commande `find` permet de rechercher des fichiers et répertoires selon diver
 ---
 
 ## 5. Réseau et connectivité
+### Liste des commandes  réseau utiles
 
 | Commande | Usage |
 | --- | --- |
@@ -104,23 +104,115 @@ La commande `find` permet de rechercher des fichiers et répertoires selon diver
 ---
 
 ## 6. Transferts et paquets
+### SSH / SCP
 
-* **SSH / SCP :**
-* `scp ./fichier user@ip:/destination` : Copie sécurisée vers un hôte distant.
+- **Se connecter à un serveur distant via SSH :**
+  ```bash
+  ssh utilisateur@adresse_ip
+  ```
+  
+- **Transférer un fichier vers un serveur distant avec SCP :**
+  ```bash
+  scp chemin/vers/fichier utilisateur@adresse_ip:chemin/destination
+  ```
+  
+- **Transférer un fichier depuis un serveur distant avec SCP :**
+  ```bash
+  scp utilisateur@adresse_ip:chemin/vers/fichier chemin/local/destination
+  ```
 
+- **Transférer un répertoire entier avec SCP :**
+  ```bash
+  scp -r chemin/vers/répertoire utilisateur@adresse_ip:chemin/destination
+  ```
 
-* **Gestion des dépôts (Ubuntu/Debian) :**
-* `add-apt-repository --remove ppa:nom/ppa` : Supprime un dépôt PPA.
+- **Utiliser une clé privée pour se connecter :**
+  ```bash
+  ssh -i chemin/vers/clé utilisateur@adresse_ip
+  ```
 
+### Gestion des dépôts (Ubuntu/Debian)
 
+- **Mettre à jour la liste des paquets :**
+  ```bash
+  sudo apt update
+  sudo dnf check-update
+  ```
+
+- **Mettre à niveau les paquets installés :**
+  ```bash
+  sudo apt upgrade
+  sudo dnf upgrade
+  ```
+
+- **Installer un paquet :**
+  ```bash
+  sudo apt install nom_du_paquet
+  sudo dnf install nom_du_paquet
+  ```
+
+- **Désinstaller un paquet :**
+  ```bash
+  sudo apt remove nom_du_paquet
+  sudo dnf remone nom_du_paquet
+  ```
+  
+- **Ajouter un dépôt :**
+  1. Ouvrir le fichier sources :
+     ```bash
+    sudo nano /etc/apt/sources.list
+     
+    (Créer un fichier `.repo` dans `/etc/yum.repos.d/`, par exemple :)
+     sudo nano /etc/yum.repos.d/mon_dépôt.repo
+	    [nom_du_dépôt]
+		name=Description du dépôt
+		baseurl=http://url_du_dépôt
+		enabled=1
+		gpgcheck=1
+
+     ```
+  2. Ajouter la ligne correspondant au dépôt (ex: `deb http://archive.ubuntu.com/ubuntu/ focal main`).
+
+- **Installer un paquet à partir d’un dépôt spécifique :**
+  ```bash
+  sudo apt install nom_du_paquet -t nom_du_dépôt
+  ```
+
+- **Supprimer un dépôt :**
+  1. Ouvrir le fichier sources :
+     ```bash
+     sudo nano /etc/apt/sources.list
+     ```
+  2. Commenter ou supprimer la ligne du dépôt.
+
+- **Vérifier les dépôts activés :**
+  ```bash
+  apt policy
+  dnf repolist
+  ```
 
 ---
 
 ## 7. Structure du répertoire `/usr/local`
 
-> **Note :** Ce répertoire est destiné aux logiciels installés manuellement (souvent compilés), en dehors du gestionnaire de paquets officiel (`apt`, `dnf`). Cela évite que les mises à jour du système n'écrasent vos programmes personnalisés.
 
-* `/usr/local/bin` : Exécutables pour les utilisateurs.
-* `/usr/local/sbin` : Exécutables pour l'administration.
-* `/usr/local/lib` : Bibliothèques partagées.
- 
+- **`/usr/local/`**
+  - Contient les fichiers utilisés par le système local mais qui ne sont pas gérés par le gestionnaire de paquets.
+### Sous-répertoires Communs
+
+| Sous-répertoire          | Description                                               |
+|-------------------------|-----------------------------------------------------------|
+| **`bin/`                | Contient les exécutables locaux.                          |
+| **`etc/`                | Contient les fichiers de configuration locale.            |
+| **`include/`            | Contient les fichiers d'en-tête pour les bibliothèques.  |
+| **`lib/`                | Contient les bibliothèques partagées et locales.         |
+| **`man/`                | Contient les pages de manuel locales.                     |
+| **`sbin/`               | Contient les exécutables systèmes locaux (pour l'administration). |
+| **`share/`              | Contient les fichiers de données partagés (ex: documentation, icônes). |
+| **`src/`                | Contient le code source des programmes installés localement. |
+
+### Points Clés
+
+- **Isolation :** Le répertoire `/usr/local` est utilisé pour séparer les applications installées manuellement des applications gérées par le système et son gestionnaire de paquets.
+- **Privilèges :** Les utilisateurs normaux n'ont généralement pas besoin de modifier ce répertoire, mais l'accès est souvent requis pour les administrateurs.
+- **Personnalisation :** Les sous-répertoires permettent de garder une organisation claire pour les diverses ressources et configurations associées aux programmes installés localement.

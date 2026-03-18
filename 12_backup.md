@@ -107,10 +107,10 @@ rsync [OPTIONS] SOURCE DESTINATION
 rsync -av /var/www/html/ /backup/www/
 
 # Miroir exact (suppression des fichiers absents de la source)
-rsync -av --delete /home/edouard/ /backup/home/edouard/
+rsync -av --delete /home/adm/ /backup/home/adm/
 
 # Simulation préalable (bonne pratique)
-rsync -avn --delete /home/edouard/ /backup/home/edouard/
+rsync -avn --delete /home/adm/ /backup/home/adm/
 ```
 
 #### Synchronisation distante via SSH
@@ -1158,4 +1158,4 @@ target/          # Rust/Maven build
 
 ---
 
-*Document généré pour usage professionnel — SysAdmin Linux Reference Series*
+ 

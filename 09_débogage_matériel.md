@@ -1,4 +1,4 @@
-# Guide Complet : Maîtriser le Débogage Matériel via le Shell sous Linux
+# Le Débogage Matériel pour Lenovo Thinkpad T420 via le Shell sous Linux
 
 ## Table des matières
 
